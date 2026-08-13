@@ -28,9 +28,23 @@ jobs:
       - name: Add Android platform
         run: npx cap add android
 
-        - name: Add package visibility queries
+      - name: Add package visibility queries
         run: |
-          perl -0777 -pi -e 's#</manifest>#  <queries>\n    <package android:name="com.whatsapp" />\n    <package android:name="com.instagram.android" />\n    <package android:name="com.google.android.youtube" />\n    <package android:name="com.google.android.calculator" />\n  </queries>\n</manifest>#' android/app/src/main/AndroidManifest.xml
+          python3 - <<'EOF'
+          path = "android/app/src/main/AndroidManifest.xml"
+          with open(path) as f:
+              content = f.read()
+          queries = '''  <queries>
+              <package android:name="com.whatsapp" />
+              <package android:name="com.instagram.android" />
+              <package android:name="com.google.android.youtube" />
+              <package android:name="com.google.android.calculator" />
+            </queries>
+          </manifest>'''
+          content = content.replace("</manifest>", queries)
+          with open(path, "w") as f:
+              f.write(content)
+          EOF
 
       - name: Sync web assets into the native project
         run: npx cap sync android
