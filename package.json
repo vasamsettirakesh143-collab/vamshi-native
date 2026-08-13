@@ -1,0 +1,12 @@
+{
+  "name": "vamshi-ai",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@capacitor/android": "latest",
+    "@capacitor/core": "latest"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "latest"
+  }
+}
