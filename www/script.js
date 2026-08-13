@@ -4,27 +4,45 @@ const listenBtn = document.getElementById("listenBtn");
 const status = document.getElementById("status");
 const userText = document.getElementById("userText");
 
-function speak(text) {
+function getTTS() {
+    return window.Capacitor && window.Capacitor.Plugins
+        ? window.Capacitor.Plugins.TextToSpeech
+        : null;
+}
+
+function getSTT() {
+    return window.Capacitor && window.Capacitor.Plugins
+        ? window.Capacitor.Plugins.SpeechRecognition
+        : null;
+}
+
+async function speak(text) {
 
     if (!text) return;
 
-    window.speechSynthesis.cancel();
+    const tts = getTTS();
 
-    const speech = new SpeechSynthesisUtterance(String(text));
+    if (!tts) {
+        status.innerText = "Voice output not available";
+        return;
+    }
 
-    speech.lang = "en-US";
-    speech.rate = 1;
-    speech.pitch = 1;
+    status.innerText = "Vamshi speaking...";
 
-    speech.onstart = () => {
-        status.innerText = "Vamshi speaking...";
-    };
+    try {
+        await tts.speak({
+            text: String(text),
+            lang: "en-US",
+            rate: 1.0,
+            pitch: 1.0,
+            volume: 1.0,
+        });
+    } catch (err) {
+        console.error(err);
+    }
 
-    speech.onend = () => {
-        status.innerText = "Vamshi ready";
-    };
+    status.innerText = "Vamshi ready";
 
-    window.speechSynthesis.speak(speech);
 }
 
 startBtn.addEventListener("click", () => {
@@ -35,51 +53,63 @@ startBtn.addEventListener("click", () => {
 
 });
 
-const SpeechRecognitionImpl =
-    window.SpeechRecognition || window.webkitSpeechRecognition;
+listenBtn.addEventListener("click", async () => {
 
-listenBtn.addEventListener("click", () => {
+    const stt = getSTT();
 
-    if (!SpeechRecognitionImpl) {
-
-        status.innerText = "Voice recognition not supported in this browser";
-
-        speak("Sorry Rakesh, this browser does not support voice recognition.");
-
+    if (!stt) {
+        status.innerText = "Voice input not available";
+        speak("Sorry Rakesh, voice input is not available.");
         return;
     }
 
-    const recognition = new SpeechRecognitionImpl();
+    try {
 
-    recognition.lang = "en-US";
+        const permission = await stt.requestPermissions();
 
-    recognition.start();
-
-    recognition.onstart = () => {
-        status.innerText = "Listening...";
-    };
-
-    recognition.onresult = async (event) => {
-
-        try {
-
-            const text = event.results[0][0].transcript;
-
-            userText.innerText = "You: " + text;
-
-            status.innerText = "Thinking...";
-
-            const reply = await VamshiBrain(text);
-
-            userText.innerText =
-                "You: " + text + "\n\nVamshi: " + String(reply);
-
-            speak(String(reply));
-
-        } catch (error) {
-
-            console.error(error);
-
-            speak("Sorry, something went wrong.");
+        if (permission.speechRecognition !== "granted") {
+            status.innerText = "Microphone permission denied";
+            speak("Sorry Rakesh, I need microphone permission.");
+            return;
         }
-    };
+
+        status.innerText = "Listening...";
+
+        const result = await stt.start({
+            language: "en-US",
+            maxResults: 1,
+            partialResults: false,
+            popup: false,
+        });
+
+        const text = result && result.matches && result.matches[0]
+            ? result.matches[0]
+            : "";
+
+        if (!text) {
+            status.innerText = "Didn't catch that";
+            return;
+        }
+
+        userText.innerText = "You: " + text;
+
+        status.innerText = "Thinking...";
+
+        const reply = await VamshiBrain(text.toLowerCase());
+
+        userText.innerText =
+            "You: " + text + "\n\nVamshi: " + String(reply);
+
+        await speak(String(reply));
+
+    } catch (error) {
+
+        console.error(error);
+
+        status.innerText = "Voice error";
+
+        speak("Sorry Rakesh. I could not hear you.");
+
+    }
+
+});
