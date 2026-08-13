@@ -1,0 +1,6 @@
+{
+  "appId": "com.vamshi.ai",
+  "appName": "Vamshi AI",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}
