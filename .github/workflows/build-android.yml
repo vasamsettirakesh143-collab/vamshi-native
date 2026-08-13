@@ -46,6 +46,9 @@ jobs:
               f.write(content)
           EOF
 
+      - name: Show manifest for debugging
+        run: cat android/app/src/main/AndroidManifest.xml
+
       - name: Sync web assets into the native project
         run: npx cap sync android
 
