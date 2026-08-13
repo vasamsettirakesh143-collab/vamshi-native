@@ -4,7 +4,9 @@
   "private": true,
   "dependencies": {
     "@capacitor/android": "latest",
-    "@capacitor/core": "latest"
+    "@capacitor/core": "latest",
+    "@capacitor-community/text-to-speech": "latest",
+    "@capacitor-community/speech-recognition": "latest"
   },
   "devDependencies": {
     "@capacitor/cli": "latest"
