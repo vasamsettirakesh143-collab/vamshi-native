@@ -37,14 +37,18 @@ jobs:
 
           permissions = '''  <uses-permission android:name="android.permission.RECORD_AUDIO" />
             <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-            <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
           '''
           content = content.replace("<application", permissions + "\n    <application", 1)
 
           service_decl = '''    <service
                 android:name=".VamshiForegroundService"
                 android:exported="false"
-                android:foregroundServiceType="microphone" />
+                android:foregroundServiceType="specialUse">
+                <property
+                    android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                    android:value="voice_assistant_keepalive" />
+            </service>
           </application>'''
           content = content.replace("</application>", service_decl)
 
@@ -73,13 +77,6 @@ jobs:
           cp native/AppLauncherNativePlugin.java android/app/src/main/java/com/vamshi/ai/AppLauncherNativePlugin.java
           cp native/VamshiForegroundService.java android/app/src/main/java/com/vamshi/ai/VamshiForegroundService.java
           cp native/MainActivity.java android/app/src/main/java/com/vamshi/ai/MainActivity.java
-
-      - name: List injected files (debug)
-        run: |
-          echo "--- native/ folder in repo ---"
-          ls -la native/
-          echo "--- destination folder in android project ---"
-          ls -la android/app/src/main/java/com/vamshi/ai/
 
       - name: Build debug APK
         working-directory: android
