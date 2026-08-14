@@ -28,12 +28,26 @@ jobs:
       - name: Add Android platform
         run: npx cap add android
 
-      - name: Add package visibility queries
+      - name: Patch AndroidManifest
         run: |
           python3 - <<'EOF'
           path = "android/app/src/main/AndroidManifest.xml"
           with open(path) as f:
               content = f.read()
+
+          permissions = '''  <uses-permission android:name="android.permission.RECORD_AUDIO" />
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+          '''
+          content = content.replace("<application", permissions + "\n    <application", 1)
+
+          service_decl = '''    <service
+                android:name=".VamshiForegroundService"
+                android:exported="false"
+                android:foregroundServiceType="microphone" />
+          </application>'''
+          content = content.replace("</application>", service_decl)
+
           queries = '''  <queries>
               <package android:name="com.whatsapp" />
               <package android:name="com.instagram.android" />
@@ -42,6 +56,7 @@ jobs:
             </queries>
           </manifest>'''
           content = content.replace("</manifest>", queries)
+
           with open(path, "w") as f:
               f.write(content)
           EOF
@@ -52,10 +67,11 @@ jobs:
       - name: Sync web assets into the native project
         run: npx cap sync android
 
-      - name: Inject native App Launcher plugin
+      - name: Inject native plugins
         run: |
           mkdir -p android/app/src/main/java/com/vamshi/ai
           cp native/AppLauncherNativePlugin.java android/app/src/main/java/com/vamshi/ai/AppLauncherNativePlugin.java
+          cp native/VamshiForegroundService.java android/app/src/main/java/com/vamshi/ai/VamshiForegroundService.java
           cp native/MainActivity.java android/app/src/main/java/com/vamshi/ai/MainActivity.java
 
       - name: Build debug APK
