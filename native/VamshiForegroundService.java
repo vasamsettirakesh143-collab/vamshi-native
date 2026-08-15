@@ -39,6 +39,9 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     private static final String CHANNEL_ID = "vamshi_service_channel";
     private static final int NOTIFICATION_ID = 1001;
     private static final String BACKEND_URL = "https://vamshi-backend-y6ja.onrender.com/chat";
+    private static final String[] KEYWORDS = {
+        "whatsapp", "instagram", "youtube", "calculator", "time", "date", "hello", "hi", "hey"
+    };
 
     private SpeechRecognizer speechRecognizer;
     private TextToSpeech textToSpeech;
@@ -135,9 +138,8 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         );
         recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US);
         recognizerIntent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getPackageName());
+        recognizerIntent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5);
 
-        // Give the recognizer more patience before deciding you're done
-        // talking, so "Vamshi, open WhatsApp" isn't cut off after "Vamshi".
         recognizerIntent.putExtra(
             "android.speech.extra.SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS", 2500
         );
@@ -164,26 +166,40 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             return;
         }
 
-        String heard = matches.get(0).toLowerCase(Locale.US);
-
         if (awaitingFollowUp) {
-            // We already said "Yes?" after hearing just the wake word —
-            // treat this next utterance as the command directly, no need
-            // to say "vamshi" again.
             awaitingFollowUp = false;
-            handleCommand(heard.trim());
+            handleCommand(pickBestGuess(matches).trim());
             return;
         }
 
-        if (heard.contains("vamshi")) {
-            String command = heard.replace("hey vamshi", "")
-                    .replace("vamshi", "")
-                    .trim();
+        String wakeMatch = null;
+        for (String m : matches) {
+            String lower = m.toLowerCase(Locale.US);
+            if (lower.contains("vamshi")) {
+                wakeMatch = lower;
+                break;
+            }
+        }
+
+        if (wakeMatch != null) {
+            String command = wakeMatch.replace("hey vamshi", "").replace("vamshi", "").trim();
             handleCommand(command);
             return;
         }
 
         restartListeningSoon();
+    }
+
+    // Prefer whichever alternative guess actually contains a keyword we
+    // understand, instead of blindly trusting Android's single top guess.
+    private String pickBestGuess(ArrayList<String> matches) {
+        for (String m : matches) {
+            String lower = m.toLowerCase(Locale.US);
+            for (String kw : KEYWORDS) {
+                if (lower.contains(kw)) return lower;
+            }
+        }
+        return matches.get(0).toLowerCase(Locale.US);
     }
 
     private void handleCommand(String command) {
@@ -206,13 +222,13 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             String date = DateFormat.getDateInstance(DateFormat.FULL).format(new Date());
             speak("Today is " + date);
             restartListeningSoon();
-        } else if (command.contains("open whatsapp")) {
+        } else if (command.contains("whatsapp")) {
             launchAppByName("com.whatsapp", "whatsapp");
-        } else if (command.contains("open instagram")) {
+        } else if (command.contains("instagram")) {
             launchAppByName("com.instagram.android", "instagram");
-        } else if (command.contains("open youtube")) {
+        } else if (command.contains("youtube")) {
             launchAppByName("com.google.android.youtube", "youtube");
-        } else if (command.contains("open calculator")) {
+        } else if (command.contains("calculator")) {
             launchAppByName("com.google.android.calculator", "calculator");
         } else {
             askAINative(command);
@@ -220,8 +236,15 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     }
 
     private void launchAppByName(String packageName, String label) {
-        boolean opened = AppLauncherUtil.launch(this, packageName);
-        speak(opened ? "Opening " + label : label + " is not installed.");
+        try {
+            Intent trampolineIntent = new Intent(this, LaunchTrampolineActivity.class);
+            trampolineIntent.putExtra("packageName", packageName);
+            trampolineIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(trampolineIntent);
+            speak("Opening " + label);
+        } catch (Exception e) {
+            speak("Sorry, I could not open " + label + ".");
+        }
         restartListeningSoon();
     }
 
