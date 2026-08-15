@@ -1,7 +1,5 @@
 package com.vamshi.ai;
 
-import android.content.Intent;
-import android.content.pm.PackageManager;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -19,12 +17,9 @@ public class AppLauncherNativePlugin extends Plugin {
             return;
         }
 
-        PackageManager pm = getContext().getPackageManager();
-        Intent launchIntent = pm.getLaunchIntentForPackage(packageName);
+        boolean opened = AppLauncherUtil.launch(getContext(), packageName);
 
-        if (launchIntent != null) {
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getContext().startActivity(launchIntent);
+        if (opened) {
             call.resolve();
         } else {
             call.reject("App not installed: " + packageName);
