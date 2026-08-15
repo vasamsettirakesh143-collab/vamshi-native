@@ -37,6 +37,7 @@ jobs:
 
           permissions = '''  <uses-permission android:name="android.permission.RECORD_AUDIO" />
             <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
             <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
             <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
           '''
@@ -45,7 +46,7 @@ jobs:
           service_decl = '''    <service
                 android:name=".VamshiForegroundService"
                 android:exported="false"
-                android:foregroundServiceType="specialUse">
+                android:foregroundServiceType="microphone|specialUse">
                 <property
                     android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                     android:value="voice_assistant_keepalive" />
@@ -75,6 +76,7 @@ jobs:
       - name: Inject native plugins
         run: |
           mkdir -p android/app/src/main/java/com/vamshi/ai
+          cp native/AppLauncherUtil.java android/app/src/main/java/com/vamshi/ai/AppLauncherUtil.java
           cp native/AppLauncherNativePlugin.java android/app/src/main/java/com/vamshi/ai/AppLauncherNativePlugin.java
           cp native/VamshiForegroundService.java android/app/src/main/java/com/vamshi/ai/VamshiForegroundService.java
           cp native/MainActivity.java android/app/src/main/java/com/vamshi/ai/MainActivity.java
