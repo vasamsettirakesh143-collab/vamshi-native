@@ -41,12 +41,7 @@ jobs:
             <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
             <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
           '''
-          content = content.replace("<application", permissions + "\n    <application", 1)
-
-          content = content.replace(
-              'android:name=".MainActivity"',
-              'android:name=".MainActivity"\n            android:launchMode="singleTask"'
-          )
+          
 
           service_decl = '''    <service
                 android:name=".VamshiForegroundService"
