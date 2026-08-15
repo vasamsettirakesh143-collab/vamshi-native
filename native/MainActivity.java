@@ -9,26 +9,55 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class MainActivity extends BridgeActivity {
 
-    private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 2001;
+    private static final int PERMISSION_REQUEST_CODE = 2001;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(AppLauncherNativePlugin.class);
         super.onCreate(savedInstanceState);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                    != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(
-                    this,
-                    new String[]{ Manifest.permission.POST_NOTIFICATIONS },
-                    NOTIFICATION_PERMISSION_REQUEST_CODE
-                );
-            }
+        requestNeededPermissions();
+    }
+
+    private void requestNeededPermissions() {
+        List<String> toRequest = new ArrayList<>();
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            toRequest.add(Manifest.permission.RECORD_AUDIO);
         }
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            toRequest.add(Manifest.permission.POST_NOTIFICATIONS);
+        }
+
+        if (!toRequest.isEmpty()) {
+            ActivityCompat.requestPermissions(
+                this,
+                toRequest.toArray(new String[0]),
+                PERMISSION_REQUEST_CODE
+            );
+        } else {
+            startVamshiService();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            startVamshiService();
+        }
+    }
+
+    private void startVamshiService() {
         Intent serviceIntent = new Intent(this, VamshiForegroundService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent);
