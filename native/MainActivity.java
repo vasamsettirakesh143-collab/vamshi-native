@@ -42,12 +42,18 @@ public class MainActivity extends BridgeActivity {
 
         intent.removeExtra(EXTRA_TARGET_PACKAGE);
 
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+        Handler handler = new Handler(Looper.getMainLooper());
+
+        // Give our own screen time to fully resume first.
+        handler.postDelayed(() -> {
             boolean opened = AppLauncherUtil.launch(MainActivity.this, targetPackage);
+
             if (opened) {
-                moveTaskToBack(true);
+                // Give the target app's window time to actually render
+                // before we duck away — this is the piece that was missing.
+                handler.postDelayed(() -> moveTaskToBack(true), 700);
             }
-        }, 150);
+        }, 400);
     }
 
     private void requestNeededPermissions() {
