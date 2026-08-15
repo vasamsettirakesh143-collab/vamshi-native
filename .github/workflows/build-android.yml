@@ -43,6 +43,11 @@ jobs:
           '''
           content = content.replace("<application", permissions + "\n    <application", 1)
 
+          content = content.replace(
+              'android:name=".MainActivity"',
+              'android:name=".MainActivity"\n            android:launchMode="singleTask"'
+          )
+
           service_decl = '''    <service
                 android:name=".VamshiForegroundService"
                 android:exported="false"
