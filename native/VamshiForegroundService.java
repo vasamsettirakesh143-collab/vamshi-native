@@ -44,6 +44,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     private TextToSpeech textToSpeech;
     private Handler handler;
     private boolean listeningEnabled = false;
+    private boolean awaitingFollowUp = false;
 
     @Override
     public void onCreate() {
@@ -135,6 +136,18 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US);
         recognizerIntent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getPackageName());
 
+        // Give the recognizer more patience before deciding you're done
+        // talking, so "Vamshi, open WhatsApp" isn't cut off after "Vamshi".
+        recognizerIntent.putExtra(
+            "android.speech.extra.SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS", 2500
+        );
+        recognizerIntent.putExtra(
+            "android.speech.extra.SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS", 2000
+        );
+        recognizerIntent.putExtra(
+            "android.speech.extra.SPEECH_INPUT_MINIMUM_LENGTH_MILLIS", 3000
+        );
+
         speechRecognizer.startListening(recognizerIntent);
     }
 
@@ -145,22 +158,38 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     @Override
     public void onResults(Bundle results) {
         ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-        if (matches != null && !matches.isEmpty()) {
-            String heard = matches.get(0).toLowerCase(Locale.US);
-            if (heard.contains("vamshi")) {
-                String command = heard.replace("hey vamshi", "")
-                        .replace("vamshi", "")
-                        .trim();
-                handleCommand(command);
-                return;
-            }
+
+        if (matches == null || matches.isEmpty()) {
+            restartListeningSoon();
+            return;
         }
+
+        String heard = matches.get(0).toLowerCase(Locale.US);
+
+        if (awaitingFollowUp) {
+            // We already said "Yes?" after hearing just the wake word —
+            // treat this next utterance as the command directly, no need
+            // to say "vamshi" again.
+            awaitingFollowUp = false;
+            handleCommand(heard.trim());
+            return;
+        }
+
+        if (heard.contains("vamshi")) {
+            String command = heard.replace("hey vamshi", "")
+                    .replace("vamshi", "")
+                    .trim();
+            handleCommand(command);
+            return;
+        }
+
         restartListeningSoon();
     }
 
     private void handleCommand(String command) {
 
         if (command.isEmpty()) {
+            awaitingFollowUp = true;
             speak("Yes?");
             restartListeningSoon();
             return;
