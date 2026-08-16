@@ -214,21 +214,8 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     }
 
     private void launchAppByName(String packageName, String label) {
-        boolean installed = getPackageManager().getLaunchIntentForPackage(packageName) != null;
-
-        if (!installed) {
-            speak(label + " is not installed.");
-            restartListeningSoon();
-            return;
-        }
-
-        speak("Opening " + label);
-
-        Intent bringSelfForward = new Intent(this, MainActivity.class);
-        bringSelfForward.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        bringSelfForward.putExtra(MainActivity.EXTRA_TARGET_PACKAGE, packageName);
-        startActivity(bringSelfForward);
-
+        boolean opened = AppLauncherUtil.launch(this, packageName);
+        speak(opened ? "Opening " + label : label + " is not installed.");
         restartListeningSoon();
     }
 
