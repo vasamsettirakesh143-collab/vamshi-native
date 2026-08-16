@@ -1,96 +1,40 @@
 package com.vamshi.ai;
 
 import android.Manifest;
-import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
-import android.widget.ScrollView;
-import android.widget.TextView;
+import android.provider.Settings;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends BridgeActivity {
 
     private static final int PERMISSION_REQUEST_CODE = 2001;
-    public static final String EXTRA_TARGET_PACKAGE = "target_package";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(AppLauncherNativePlugin.class);
         super.onCreate(savedInstanceState);
 
-        showLastCrashIfAny();
+        requestOverlayPermissionIfNeeded();
         requestNeededPermissions();
-        handleLaunchTarget(getIntent());
     }
 
-    private void showLastCrashIfAny() {
-        try {
-            File file = new File(getFilesDir(), "crash_log.txt");
-            if (!file.exists()) return;
-
-            FileInputStream fis = new FileInputStream(file);
-            byte[] data = new byte[(int) file.length()];
-            fis.read(data);
-            fis.close();
-            file.delete();
-
-            String crashText = new String(data);
-
-            TextView textView = new TextView(this);
-            textView.setText(crashText);
-            textView.setPadding(32, 32, 32, 32);
-            textView.setTextIsSelectable(true);
-
-            ScrollView scrollView = new ScrollView(this);
-            scrollView.addView(textView);
-
-            new AlertDialog.Builder(this)
-                .setTitle("Last crash")
-                .setView(scrollView)
-                .setPositiveButton("OK", null)
-                .show();
-
-        } catch (Exception ignored) {
+    private void requestOverlayPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            Intent intent = new Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:" + getPackageName())
+            );
+            startActivity(intent);
         }
-    }
-
-    @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        setIntent(intent);
-        handleLaunchTarget(intent);
-    }
-
-    private void handleLaunchTarget(Intent intent) {
-        if (intent == null) return;
-        String targetPackage = intent.getStringExtra(EXTRA_TARGET_PACKAGE);
-        if (targetPackage == null) return;
-
-        intent.removeExtra(EXTRA_TARGET_PACKAGE);
-
-        Handler handler = new Handler(Looper.getMainLooper());
-
-        handler.postDelayed(() -> {
-            boolean opened = AppLauncherUtil.launch(MainActivity.this, targetPackage);
-
-            if (opened) {
-                handler.postDelayed(() -> moveTaskToBack(true), 700);
-            }
-        }, 400);
     }
 
     private void requestNeededPermissions() {
@@ -127,23 +71,11 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void startVamshiService() {
-        try {
-            Intent serviceIntent = new Intent(this, VamshiForegroundService.class);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(serviceIntent);
-            } else {
-                startService(serviceIntent);
-            }
-        } catch (Exception e) {
-            try {
-                File file = new File(getFilesDir(), "crash_log.txt");
-                FileOutputStream fos = new FileOutputStream(file);
-                StringWriter sw = new StringWriter();
-                e.printStackTrace(new PrintWriter(sw));
-                fos.write(sw.toString().getBytes());
-                fos.close();
-            } catch (Exception ignored) {
-            }
+        Intent serviceIntent = new Intent(this, VamshiForegroundService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
         }
     }
 }
