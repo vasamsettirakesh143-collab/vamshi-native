@@ -41,7 +41,11 @@ jobs:
             <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
             <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
           '''
-          content = content.replace("<application", permissions + "\n    <application", 1)
+          content = content.replace(
+              "<application",
+              permissions + '\n    <application\n        android:name=".VamshiApp"',
+              1
+          )
 
           service_decl = '''    <service
                 android:name=".VamshiForegroundService"
@@ -79,6 +83,7 @@ jobs:
           cp native/AppLauncherUtil.java android/app/src/main/java/com/vamshi/ai/AppLauncherUtil.java
           cp native/AppLauncherNativePlugin.java android/app/src/main/java/com/vamshi/ai/AppLauncherNativePlugin.java
           cp native/VamshiForegroundService.java android/app/src/main/java/com/vamshi/ai/VamshiForegroundService.java
+          cp native/VamshiApp.java android/app/src/main/java/com/vamshi/ai/VamshiApp.java
           cp native/MainActivity.java android/app/src/main/java/com/vamshi/ai/MainActivity.java
 
       - name: Build debug APK
