@@ -1,16 +1,24 @@
 package com.vamshi.ai;
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.widget.ScrollView;
+import android.widget.TextView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,8 +32,40 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AppLauncherNativePlugin.class);
         super.onCreate(savedInstanceState);
 
+        showLastCrashIfAny();
         requestNeededPermissions();
         handleLaunchTarget(getIntent());
+    }
+
+    private void showLastCrashIfAny() {
+        try {
+            File file = new File(getFilesDir(), "crash_log.txt");
+            if (!file.exists()) return;
+
+            FileInputStream fis = new FileInputStream(file);
+            byte[] data = new byte[(int) file.length()];
+            fis.read(data);
+            fis.close();
+            file.delete();
+
+            String crashText = new String(data);
+
+            TextView textView = new TextView(this);
+            textView.setText(crashText);
+            textView.setPadding(32, 32, 32, 32);
+            textView.setTextIsSelectable(true);
+
+            ScrollView scrollView = new ScrollView(this);
+            scrollView.addView(textView);
+
+            new AlertDialog.Builder(this)
+                .setTitle("Last crash")
+                .setView(scrollView)
+                .setPositiveButton("OK", null)
+                .show();
+
+        } catch (Exception ignored) {
+        }
     }
 
     @Override
@@ -44,13 +84,10 @@ public class MainActivity extends BridgeActivity {
 
         Handler handler = new Handler(Looper.getMainLooper());
 
-        // Give our own screen time to fully resume first.
         handler.postDelayed(() -> {
             boolean opened = AppLauncherUtil.launch(MainActivity.this, targetPackage);
 
             if (opened) {
-                // Give the target app's window time to actually render
-                // before we duck away — this is the piece that was missing.
                 handler.postDelayed(() -> moveTaskToBack(true), 700);
             }
         }, 400);
@@ -90,11 +127,23 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void startVamshiService() {
-        Intent serviceIntent = new Intent(this, VamshiForegroundService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent);
-        } else {
-            startService(serviceIntent);
+        try {
+            Intent serviceIntent = new Intent(this, VamshiForegroundService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent);
+            } else {
+                startService(serviceIntent);
+            }
+        } catch (Exception e) {
+            try {
+                File file = new File(getFilesDir(), "crash_log.txt");
+                FileOutputStream fos = new FileOutputStream(file);
+                StringWriter sw = new StringWriter();
+                e.printStackTrace(new PrintWriter(sw));
+                fos.write(sw.toString().getBytes());
+                fos.close();
+            } catch (Exception ignored) {
+            }
         }
     }
 }
