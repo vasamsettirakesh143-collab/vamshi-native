@@ -214,7 +214,14 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     }
 
     private void launchAppByName(String packageName, String label) {
-        boolean opened = AppLauncherUtil.launch(this, packageName);
+        boolean opened;
+
+        if (VamshiAccessibilityService.isRunning()) {
+            opened = VamshiAccessibilityService.launchApp(packageName);
+        } else {
+            opened = AppLauncherUtil.launch(this, packageName);
+        }
+
         speak(opened ? "Opening " + label : label + " is not installed.");
         restartListeningSoon();
     }
@@ -228,8 +235,8 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setDoOutput(true);
-                conn.setConnectTimeout(15000);
-                conn.setReadTimeout(15000);
+                conn.setConnectTimeout(45000);
+                conn.setReadTimeout(45000);
 
                 JSONObject body = new JSONObject();
                 body.put("message", message);
