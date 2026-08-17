@@ -1,9 +1,10 @@
 package com.vamshi.ai;
 
 import android.Manifest;
+import android.app.AlertDialog;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -23,18 +24,32 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AppLauncherNativePlugin.class);
         super.onCreate(savedInstanceState);
 
-        requestOverlayPermissionIfNeeded();
+        promptAccessibilityIfNeeded();
         requestNeededPermissions();
     }
 
-    private void requestOverlayPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-            Intent intent = new Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:" + getPackageName())
-            );
-            startActivity(intent);
+    private boolean isAccessibilityServiceEnabled() {
+        ComponentName expected = new ComponentName(this, VamshiAccessibilityService.class);
+        String enabledServices = Settings.Secure.getString(
+            getContentResolver(),
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        );
+        return enabledServices != null && enabledServices.contains(expected.flattenToString());
+    }
+
+    private void promptAccessibilityIfNeeded() {
+        if (isAccessibilityServiceEnabled()) {
+            return;
         }
+
+        new AlertDialog.Builder(this)
+            .setTitle("One-time setup needed")
+            .setMessage("For Vamshi to open apps for you automatically, turn on \"Vamshi AI\" under Accessibility settings on the next screen.")
+            .setPositiveButton("Open Settings", (dialog, which) -> {
+                startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+            })
+            .setNegativeButton("Skip", null)
+            .show();
     }
 
     private void requestNeededPermissions() {
