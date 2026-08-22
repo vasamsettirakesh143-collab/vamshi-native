@@ -245,17 +245,29 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                 os.write(body.toString().getBytes("UTF-8"));
                 os.close();
 
-                BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                int statusCode = conn.getResponseCode();
+
+                BufferedReader br = new BufferedReader(new InputStreamReader(
+                    statusCode >= 400 ? conn.getErrorStream() : conn.getInputStream()
+                ));
                 StringBuilder sb = new StringBuilder();
                 String line;
                 while ((line = br.readLine()) != null) sb.append(line);
                 br.close();
 
-                JSONObject respJson = new JSONObject(sb.toString());
-                reply = respJson.optString("reply", "Sorry, I could not get a reply.");
+                if (statusCode >= 400) {
+                    reply = "Backend returned error code " + statusCode;
+                } else {
+                    JSONObject respJson = new JSONObject(sb.toString());
+                    reply = respJson.optString("reply", "Sorry, I could not get a reply.");
+                }
 
+            } catch (java.net.SocketTimeoutException e) {
+                reply = "Debug: request timed out.";
+            } catch (java.net.UnknownHostException e) {
+                reply = "Debug: no internet connection.";
             } catch (Exception e) {
-                reply = "Sorry Rakesh, I cannot connect to my brain.";
+                reply = "Debug error: " + e.getClass().getSimpleName() + " " + e.getMessage();
             }
 
             final String finalReply = reply;
