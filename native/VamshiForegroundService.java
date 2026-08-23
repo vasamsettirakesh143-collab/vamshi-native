@@ -203,6 +203,9 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         } else if (command.startsWith("open ")) {
             String appName = command.substring(5).trim();
             launchAppByQuery(appName);
+        } else if (command.startsWith("call ")) {
+            String contactName = command.substring(5).trim();
+            placeCallByQuery(contactName);
         } else {
             askAINative(command);
         }
@@ -225,6 +228,27 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         }
 
         speak(opened ? "Opening " + match.label : "I couldn't open " + match.label);
+        restartListeningSoon();
+    }
+
+    private void placeCallByQuery(String spokenName) {
+        if (spokenName.isEmpty()) {
+            speak("Who do you want to call?");
+            restartListeningSoon();
+            return;
+        }
+
+        ContactLookupUtil.Contact match = ContactLookupUtil.findBestMatch(this, spokenName);
+
+        if (match == null) {
+            speak("I couldn't find " + spokenName + " in your contacts.");
+            restartListeningSoon();
+            return;
+        }
+
+        boolean called = CallUtil.placeCall(this, match.number);
+
+        speak(called ? "Calling " + match.name : "I don't have permission to make calls.");
         restartListeningSoon();
     }
 
