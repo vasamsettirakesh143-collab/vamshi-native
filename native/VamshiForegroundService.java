@@ -200,29 +200,31 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             String date = DateFormat.getDateInstance(DateFormat.FULL).format(new Date());
             speak("Today is " + date);
             restartListeningSoon();
-        } else if (command.contains("open whatsapp")) {
-            launchAppByName("com.whatsapp", "whatsapp");
-        } else if (command.contains("open instagram")) {
-            launchAppByName("com.instagram.android", "instagram");
-        } else if (command.contains("open youtube")) {
-            launchAppByName("com.google.android.youtube", "youtube");
-        } else if (command.contains("open calculator")) {
-            launchAppByName("com.google.android.calculator", "calculator");
+        } else if (command.startsWith("open ")) {
+            String appName = command.substring(5).trim();
+            launchAppByQuery(appName);
         } else {
             askAINative(command);
         }
     }
 
-    private void launchAppByName(String packageName, String label) {
-        boolean opened;
+    private void launchAppByQuery(String spokenName) {
+        AppLauncherUtil.AppEntry match = AppLauncherUtil.findBestMatch(this, spokenName);
 
-        if (VamshiAccessibilityService.isRunning()) {
-            opened = VamshiAccessibilityService.launchApp(packageName);
-        } else {
-            opened = AppLauncherUtil.launch(this, packageName);
+        if (match == null) {
+            speak("I couldn't find an app called " + spokenName);
+            restartListeningSoon();
+            return;
         }
 
-        speak(opened ? "Opening " + label : label + " is not installed.");
+        boolean opened;
+        if (VamshiAccessibilityService.isRunning()) {
+            opened = VamshiAccessibilityService.launchApp(match.packageName);
+        } else {
+            opened = AppLauncherUtil.launch(this, match.packageName);
+        }
+
+        speak(opened ? "Opening " + match.label : "I couldn't open " + match.label);
         restartListeningSoon();
     }
 
