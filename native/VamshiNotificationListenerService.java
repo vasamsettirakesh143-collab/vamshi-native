@@ -11,6 +11,8 @@ import java.util.Locale;
 public class VamshiNotificationListenerService extends NotificationListenerService {
 
     private TextToSpeech textToSpeech;
+    private String lastSpokenKey = "";
+    private long lastSpokenTime = 0;
 
     @Override
     public void onCreate() {
@@ -42,6 +44,19 @@ public class VamshiNotificationListenerService extends NotificationListenerServi
         String text = textChars != null ? textChars.toString() : "";
 
         if (title.isEmpty() && text.isEmpty()) return;
+
+        // Skip if this exact same notification content was just spoken
+        // in the last few seconds (Android often re-fires the same
+        // notification once it finishes loading its icon/state).
+        String key = sbn.getPackageName() + "|" + title + "|" + text;
+        long now = System.currentTimeMillis();
+
+        if (key.equals(lastSpokenKey) && (now - lastSpokenTime) < 4000) {
+            return;
+        }
+
+        lastSpokenKey = key;
+        lastSpokenTime = now;
 
         String appLabel = getAppLabel(sbn.getPackageName());
 
