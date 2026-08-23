@@ -6,9 +6,11 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
+import android.media.AudioManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -42,6 +44,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
     private SpeechRecognizer speechRecognizer;
     private TextToSpeech textToSpeech;
+    private AudioManager audioManager;
     private Handler handler;
     private boolean listeningEnabled = false;
     private boolean awaitingFollowUp = false;
@@ -51,6 +54,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         super.onCreate();
         createNotificationChannel();
         handler = new Handler(Looper.getMainLooper());
+        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
     }
 
     @Override
@@ -128,6 +132,13 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     private void startListening() {
         if (speechRecognizer == null) return;
 
+        // Something (video/music) is already using audio — don't steal
+        // focus and interrupt it. Check back shortly instead of listening.
+        if (audioManager != null && audioManager.isMusicActive()) {
+            handler.postDelayed(this::startListening, 2000);
+            return;
+        }
+
         Intent recognizerIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         recognizerIntent.putExtra(
             RecognizerIntent.EXTRA_LANGUAGE_MODEL,
@@ -200,55 +211,29 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             String date = DateFormat.getDateInstance(DateFormat.FULL).format(new Date());
             speak("Today is " + date);
             restartListeningSoon();
-        } else if (command.startsWith("open ")) {
-            String appName = command.substring(5).trim();
-            launchAppByQuery(appName);
-        } else if (command.startsWith("call ")) {
-            String contactName = command.substring(5).trim();
-            placeCallByQuery(contactName);
+        } else if (command.contains("open whatsapp")) {
+            launchAppByName("com.whatsapp", "whatsapp");
+        } else if (command.contains("open instagram")) {
+            launchAppByName("com.instagram.android", "instagram");
+        } else if (command.contains("open youtube")) {
+            launchAppByName("com.google.android.youtube", "youtube");
+        } else if (command.contains("open calculator")) {
+            launchAppByName("com.google.android.calculator", "calculator");
         } else {
             askAINative(command);
         }
     }
 
-    private void launchAppByQuery(String spokenName) {
-        AppLauncherUtil.AppEntry match = AppLauncherUtil.findBestMatch(this, spokenName);
-
-        if (match == null) {
-            speak("I couldn't find an app called " + spokenName);
-            restartListeningSoon();
-            return;
-        }
-
+    private void launchAppByName(String packageName, String label) {
         boolean opened;
+
         if (VamshiAccessibilityService.isRunning()) {
-            opened = VamshiAccessibilityService.launchApp(match.packageName);
+            opened = VamshiAccessibilityService.launchApp(packageName);
         } else {
-            opened = AppLauncherUtil.launch(this, match.packageName);
+            opened = AppLauncherUtil.launch(this, packageName);
         }
 
-        speak(opened ? "Opening " + match.label : "I couldn't open " + match.label);
-        restartListeningSoon();
-    }
-
-    private void placeCallByQuery(String spokenName) {
-        if (spokenName.isEmpty()) {
-            speak("Who do you want to call?");
-            restartListeningSoon();
-            return;
-        }
-
-        ContactLookupUtil.Contact match = ContactLookupUtil.findBestMatch(this, spokenName);
-
-        if (match == null) {
-            speak("I couldn't find " + spokenName + " in your contacts.");
-            restartListeningSoon();
-            return;
-        }
-
-        boolean called = CallUtil.placeCall(this, match.number);
-
-        speak(called ? "Calling " + match.name : "I don't have permission to make calls.");
+        speak(opened ? "Opening " + label : label + " is not installed.");
         restartListeningSoon();
     }
 
