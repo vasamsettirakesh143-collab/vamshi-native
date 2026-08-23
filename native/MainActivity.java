@@ -30,6 +30,7 @@ public class MainActivity extends BridgeActivity {
 
         showLastCrashIfAny();
         promptAccessibilityIfNeeded();
+        promptNotificationAccessIfNeeded();
         requestNeededPermissions();
     }
 
@@ -83,6 +84,29 @@ public class MainActivity extends BridgeActivity {
             .setMessage("For Vamshi to open apps for you automatically, turn on \"Vamshi AI\" under Accessibility settings on the next screen.")
             .setPositiveButton("Open Settings", (dialog, which) -> {
                 startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+            })
+            .setNegativeButton("Skip", null)
+            .show();
+    }
+
+    private boolean isNotificationAccessEnabled() {
+        String enabledListeners = Settings.Secure.getString(
+            getContentResolver(),
+            "enabled_notification_listeners"
+        );
+        return enabledListeners != null && enabledListeners.contains(getPackageName());
+    }
+
+    private void promptNotificationAccessIfNeeded() {
+        if (isNotificationAccessEnabled()) {
+            return;
+        }
+
+        new AlertDialog.Builder(this)
+            .setTitle("One more setup step")
+            .setMessage("For Vamshi to read your notifications aloud, turn on \"Vamshi AI\" under Notification Access on the next screen.")
+            .setPositiveButton("Open Settings", (dialog, which) -> {
+                startActivity(new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"));
             })
             .setNegativeButton("Skip", null)
             .show();
