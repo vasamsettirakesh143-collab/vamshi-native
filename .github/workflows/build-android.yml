@@ -68,6 +68,14 @@ jobs:
                     android:name="android.accessibilityservice"
                     android:resource="@xml/accessibility_service_config" />
             </service>
+            <service
+                android:name=".VamshiNotificationListenerService"
+                android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+                android:exported="false">
+                <intent-filter>
+                    <action android:name="android.service.notification.NotificationListenerService" />
+                </intent-filter>
+            </service>
           </application>'''
           content = content.replace("</application>", service_decl)
 
@@ -99,6 +107,7 @@ jobs:
           cp native/CallUtil.java android/app/src/main/java/com/vamshi/ai/CallUtil.java
           cp native/VamshiForegroundService.java android/app/src/main/java/com/vamshi/ai/VamshiForegroundService.java
           cp native/VamshiAccessibilityService.java android/app/src/main/java/com/vamshi/ai/VamshiAccessibilityService.java
+          cp native/VamshiNotificationListenerService.java android/app/src/main/java/com/vamshi/ai/VamshiNotificationListenerService.java
           cp native/VamshiApp.java android/app/src/main/java/com/vamshi/ai/VamshiApp.java
           cp native/MainActivity.java android/app/src/main/java/com/vamshi/ai/MainActivity.java
           mkdir -p android/app/src/main/res/xml
