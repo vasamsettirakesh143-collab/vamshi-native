@@ -41,7 +41,11 @@ jobs:
             <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
             <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
           '''
-          content = content.replace("<application", permissions + "\n    <application", 1)
+          content = content.replace(
+              "<application",
+              permissions + '\n    <application\n        android:name=".VamshiApp"',
+              1
+          )
 
           service_decl = '''    <service
                 android:name=".VamshiForegroundService"
@@ -65,11 +69,14 @@ jobs:
           </application>'''
           content = content.replace("</application>", service_decl)
 
+          # This is the key change: instead of listing individual apps,
+          # tell Android we're allowed to see EVERY app that has a
+          # launcher icon (the same visibility your home screen has).
           queries = '''  <queries>
-              <package android:name="com.whatsapp" />
-              <package android:name="com.instagram.android" />
-              <package android:name="com.google.android.youtube" />
-              <package android:name="com.google.android.calculator" />
+              <intent>
+                  <action android:name="android.intent.action.MAIN" />
+                  <category android:name="android.intent.category.LAUNCHER" />
+              </intent>
             </queries>
           </manifest>'''
           content = content.replace("</manifest>", queries)
@@ -91,6 +98,7 @@ jobs:
           cp native/AppLauncherNativePlugin.java android/app/src/main/java/com/vamshi/ai/AppLauncherNativePlugin.java
           cp native/VamshiForegroundService.java android/app/src/main/java/com/vamshi/ai/VamshiForegroundService.java
           cp native/VamshiAccessibilityService.java android/app/src/main/java/com/vamshi/ai/VamshiAccessibilityService.java
+          cp native/VamshiApp.java android/app/src/main/java/com/vamshi/ai/VamshiApp.java
           cp native/MainActivity.java android/app/src/main/java/com/vamshi/ai/MainActivity.java
           mkdir -p android/app/src/main/res/xml
           cp native/accessibility_service_config.xml android/app/src/main/res/xml/accessibility_service_config.xml
