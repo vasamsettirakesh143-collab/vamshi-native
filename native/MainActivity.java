@@ -8,10 +8,14 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.widget.ScrollView;
+import android.widget.TextView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,8 +28,40 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AppLauncherNativePlugin.class);
         super.onCreate(savedInstanceState);
 
+        showLastCrashIfAny();
         promptAccessibilityIfNeeded();
         requestNeededPermissions();
+    }
+
+    private void showLastCrashIfAny() {
+        try {
+            File file = new File(getFilesDir(), "crash_log.txt");
+            if (!file.exists()) return;
+
+            FileInputStream fis = new FileInputStream(file);
+            byte[] data = new byte[(int) file.length()];
+            fis.read(data);
+            fis.close();
+            file.delete();
+
+            String crashText = new String(data);
+
+            TextView textView = new TextView(this);
+            textView.setText(crashText);
+            textView.setPadding(32, 32, 32, 32);
+            textView.setTextIsSelectable(true);
+
+            ScrollView scrollView = new ScrollView(this);
+            scrollView.addView(textView);
+
+            new AlertDialog.Builder(this)
+                .setTitle("Last crash")
+                .setView(scrollView)
+                .setPositiveButton("OK", null)
+                .show();
+
+        } catch (Exception ignored) {
+        }
     }
 
     private boolean isAccessibilityServiceEnabled() {
@@ -64,6 +100,16 @@ public class MainActivity extends BridgeActivity {
                 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
             toRequest.add(Manifest.permission.POST_NOTIFICATIONS);
+        }
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE)
+                != PackageManager.PERMISSION_GRANTED) {
+            toRequest.add(Manifest.permission.CALL_PHONE);
+        }
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS)
+                != PackageManager.PERMISSION_GRANTED) {
+            toRequest.add(Manifest.permission.READ_CONTACTS);
         }
 
         if (!toRequest.isEmpty()) {
