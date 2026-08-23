@@ -40,6 +40,8 @@ jobs:
             <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
             <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
             <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+            <uses-permission android:name="android.permission.CALL_PHONE" />
+            <uses-permission android:name="android.permission.READ_CONTACTS" />
           '''
           content = content.replace(
               "<application",
@@ -69,9 +71,6 @@ jobs:
           </application>'''
           content = content.replace("</application>", service_decl)
 
-          # This is the key change: instead of listing individual apps,
-          # tell Android we're allowed to see EVERY app that has a
-          # launcher icon (the same visibility your home screen has).
           queries = '''  <queries>
               <intent>
                   <action android:name="android.intent.action.MAIN" />
@@ -96,6 +95,8 @@ jobs:
           mkdir -p android/app/src/main/java/com/vamshi/ai
           cp native/AppLauncherUtil.java android/app/src/main/java/com/vamshi/ai/AppLauncherUtil.java
           cp native/AppLauncherNativePlugin.java android/app/src/main/java/com/vamshi/ai/AppLauncherNativePlugin.java
+          cp native/ContactLookupUtil.java android/app/src/main/java/com/vamshi/ai/ContactLookupUtil.java
+          cp native/CallUtil.java android/app/src/main/java/com/vamshi/ai/CallUtil.java
           cp native/VamshiForegroundService.java android/app/src/main/java/com/vamshi/ai/VamshiForegroundService.java
           cp native/VamshiAccessibilityService.java android/app/src/main/java/com/vamshi/ai/VamshiAccessibilityService.java
           cp native/VamshiApp.java android/app/src/main/java/com/vamshi/ai/VamshiApp.java
