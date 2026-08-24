@@ -196,9 +196,6 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         restartListeningSoon();
     }
 
-    // IMPORTANT: order matters here. Specific commands (call, open) are
-    // checked BEFORE the loose greeting check, so a word that happens to
-    // contain "hi" or "hey" inside it doesn't hijack a real command.
     private void handleCommand(String command) {
 
         if (command.isEmpty()) {
@@ -269,16 +266,20 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             return;
         }
 
-        ContactLookupUtil.Contact contact = ContactLookupUtil.findBestMatch(this, spokenName);
+        try {
+            ContactLookupUtil.Contact contact = ContactLookupUtil.findBestMatch(this, spokenName);
 
-        if (contact == null) {
-            speak("I could not find a contact named " + spokenName);
-            restartListeningSoon();
-            return;
+            if (contact == null) {
+                speak("I could not find a contact named " + spokenName);
+                restartListeningSoon();
+                return;
+            }
+
+            boolean called = CallUtil.placeCall(this, contact.number);
+            speak(called ? "Calling " + contact.name : "Sorry, I could not place the call.");
+        } catch (Exception e) {
+            speak("Call error: " + e.getClass().getSimpleName() + " " + e.getMessage());
         }
-
-        boolean called = CallUtil.placeCall(this, contact.number);
-        speak(called ? "Calling " + contact.name : "Sorry, I could not place the call.");
         restartListeningSoon();
     }
 
@@ -290,22 +291,30 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             return;
         }
 
-        AppLauncherUtil.AppEntry match = AppLauncherUtil.findBestMatch(this, spokenAppName);
+        try {
+            AppLauncherUtil.AppEntry match = AppLauncherUtil.findBestMatch(this, spokenAppName);
 
-        if (match == null) {
-            speak("I could not find an app called " + spokenAppName);
-            restartListeningSoon();
-            return;
+            if (match == null) {
+                speak("I could not find an app called " + spokenAppName);
+                restartListeningSoon();
+                return;
+            }
+
+            boolean opened;
+            if (VamshiAccessibilityService.isRunning()) {
+                opened = VamshiAccessibilityService.launchApp(match.packageName);
+            } else {
+                opened = AppLauncherUtil.launch(this, match.packageName);
+            }
+
+            speak(opened ? "Opening " + match.label : "Sorry, I could not open " + match.label);
+
+        } catch (Exception e) {
+            // This is the important part — instead of silently dying,
+            // Vamshi now tells us exactly what broke, out loud.
+            speak("Open app error: " + e.getClass().getSimpleName() + " " + e.getMessage());
         }
 
-        boolean opened;
-        if (VamshiAccessibilityService.isRunning()) {
-            opened = VamshiAccessibilityService.launchApp(match.packageName);
-        } else {
-            opened = AppLauncherUtil.launch(this, match.packageName);
-        }
-
-        speak(opened ? "Opening " + match.label : "Sorry, I could not open " + match.label);
         restartListeningSoon();
     }
 
