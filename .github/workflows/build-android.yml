@@ -68,14 +68,6 @@ jobs:
                     android:name="android.accessibilityservice"
                     android:resource="@xml/accessibility_service_config" />
             </service>
-            <service
-                android:name=".VamshiNotificationListenerService"
-                android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
-                android:exported="false">
-                <intent-filter>
-                    <action android:name="android.service.notification.NotificationListenerService" />
-                </intent-filter>
-            </service>
           </application>'''
           content = content.replace("</application>", service_decl)
 
@@ -84,6 +76,10 @@ jobs:
                   <action android:name="android.intent.action.MAIN" />
                   <category android:name="android.intent.category.LAUNCHER" />
               </intent>
+              <package android:name="com.whatsapp" />
+              <package android:name="com.instagram.android" />
+              <package android:name="com.google.android.youtube" />
+              <package android:name="com.google.android.calculator" />
             </queries>
           </manifest>'''
           content = content.replace("</manifest>", queries)
@@ -103,11 +99,10 @@ jobs:
           mkdir -p android/app/src/main/java/com/vamshi/ai
           cp native/AppLauncherUtil.java android/app/src/main/java/com/vamshi/ai/AppLauncherUtil.java
           cp native/AppLauncherNativePlugin.java android/app/src/main/java/com/vamshi/ai/AppLauncherNativePlugin.java
-          cp native/ContactLookupUtil.java android/app/src/main/java/com/vamshi/ai/ContactLookupUtil.java
           cp native/CallUtil.java android/app/src/main/java/com/vamshi/ai/CallUtil.java
+          cp native/ContactLookupUtil.java android/app/src/main/java/com/vamshi/ai/ContactLookupUtil.java
           cp native/VamshiForegroundService.java android/app/src/main/java/com/vamshi/ai/VamshiForegroundService.java
           cp native/VamshiAccessibilityService.java android/app/src/main/java/com/vamshi/ai/VamshiAccessibilityService.java
-          cp native/VamshiNotificationListenerService.java android/app/src/main/java/com/vamshi/ai/VamshiNotificationListenerService.java
           cp native/VamshiApp.java android/app/src/main/java/com/vamshi/ai/VamshiApp.java
           cp native/MainActivity.java android/app/src/main/java/com/vamshi/ai/MainActivity.java
           mkdir -p android/app/src/main/res/xml
