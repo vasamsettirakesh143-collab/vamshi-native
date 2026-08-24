@@ -18,48 +18,10 @@ async function VamshiBrain(command) {
 
     }
 
-    // Greetings
+    // Open apps — checked early and specifically, so a command like
+    // "open whatsapp and tell me the time" still opens WhatsApp.
 
-    if (
-
-        command.includes("hello") ||
-        command.includes("hi") ||
-        command.includes("hey")
-
-    ) {
-
-        return "Hello Rakesh. I am Vamshi.";
-
-    }
-
-    // Time
-
-    else if (command.includes("time")) {
-
-        return "The current time is " +
-
-            new Date().toLocaleTimeString();
-
-    }
-
-    // Date
-
-    else if (
-
-        command.includes("date") ||
-        command.includes("today")
-
-    ) {
-
-        return "Today is " +
-
-            new Date().toDateString();
-
-    }
-
-    // Open apps
-
-    else if (command.includes("open whatsapp")) {
+    if (command.includes("open whatsapp")) {
 
         return openApp("whatsapp");
 
@@ -83,7 +45,56 @@ async function VamshiBrain(command) {
 
     }
 
-    // Unknown command
+    // Time / date — specific phrasing, not just the bare word, so a
+    // sentence that happens to mention "time" isn't misread.
+
+    else if (
+
+        command === "time" ||
+        command.includes("what time") ||
+        command.includes("the time") ||
+        command.includes("what's the time")
+
+    ) {
+
+        return "The current time is " +
+
+            new Date().toLocaleTimeString();
+
+    }
+
+    else if (
+
+        command === "date" ||
+        command.includes("today's date") ||
+        command.includes("what date") ||
+        command.includes("what's today")
+
+    ) {
+
+        return "Today is " +
+
+            new Date().toDateString();
+
+    }
+
+    // Greeting — ONLY matches when the message actually IS a greeting
+    // (starts with it, or is just that word alone), never when the word
+    // merely appears somewhere inside a longer sentence.
+
+    else if (
+
+        command === "hi" || command === "hello" || command === "hey" ||
+        command.startsWith("hi ") || command.startsWith("hello ") || command.startsWith("hey ")
+
+    ) {
+
+        return "Hello Rakesh. I am Vamshi.";
+
+    }
+
+    // Everything else — including code requests, general questions —
+    // goes to the real AI backend.
 
     else {
 
