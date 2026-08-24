@@ -48,6 +48,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     private Handler handler;
     private boolean listeningEnabled = false;
     private boolean awaitingFollowUp = false;
+    private boolean awaitingCallName = false;
 
     @Override
     public void onCreate() {
@@ -132,8 +133,6 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     private void startListening() {
         if (speechRecognizer == null) return;
 
-        // Something (video/music) is already using audio — don't steal
-        // focus and interrupt it. Check back shortly instead of listening.
         if (audioManager != null && audioManager.isMusicActive()) {
             handler.postDelayed(this::startListening, 2000);
             return;
@@ -173,6 +172,12 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         }
 
         String heard = matches.get(0).toLowerCase(Locale.US);
+
+        if (awaitingCallName) {
+            awaitingCallName = false;
+            handleCallCommand(heard.trim());
+            return;
+        }
 
         if (awaitingFollowUp) {
             awaitingFollowUp = false;
@@ -219,9 +224,47 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             launchAppByName("com.google.android.youtube", "youtube");
         } else if (command.contains("open calculator")) {
             launchAppByName("com.google.android.calculator", "calculator");
+        } else if (command.contains("call ")) {
+            String spokenName = command.substring(command.indexOf("call ") + 5).trim();
+            handleCallCommand(spokenName);
+        } else if (command.equals("call") || command.startsWith("call")) {
+            handleCallCommand("");
         } else {
             askAINative(command);
         }
+    }
+
+    private void handleCallCommand(String spokenName) {
+
+        if (spokenName.isEmpty()) {
+            speak("Who do you want to call?");
+            awaitingCallName = true;
+            restartListeningSoon();
+            return;
+        }
+
+        boolean hasContactsPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS)
+                == PackageManager.PERMISSION_GRANTED;
+        boolean hasCallPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE)
+                == PackageManager.PERMISSION_GRANTED;
+
+        if (!hasContactsPermission || !hasCallPermission) {
+            speak("I don't have permission to make calls yet. Please open the app and grant the contacts and phone permissions.");
+            restartListeningSoon();
+            return;
+        }
+
+        ContactLookupUtil.Contact contact = ContactLookupUtil.findBestMatch(this, spokenName);
+
+        if (contact == null) {
+            speak("I could not find a contact named " + spokenName);
+            restartListeningSoon();
+            return;
+        }
+
+        boolean called = CallUtil.placeCall(this, contact.number);
+        speak(called ? "Calling " + contact.name : "Sorry, I could not place the call.");
+        restartListeningSoon();
     }
 
     private void launchAppByName(String packageName, String label) {
