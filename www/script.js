@@ -1,8 +1,17 @@
-const startBtn = document.getElementById("startBtn");
-const listenBtn = document.getElementById("listenBtn");
+const chatMessages = document.getElementById("chatMessages");
+const statusEl = document.getElementById("status");
+const textInput = document.getElementById("textInput");
+const micBtn = document.getElementById("micBtn");
+const sendBtn = document.getElementById("sendBtn");
 
-const status = document.getElementById("status");
-const userText = document.getElementById("userText");
+function addBubble(sender, text, isThinking) {
+    const bubble = document.createElement("div");
+    bubble.className = "bubble " + sender + (isThinking ? " thinking" : "");
+    bubble.textContent = text;
+    chatMessages.appendChild(bubble);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    return bubble;
+}
 
 function getTTS() {
     return window.Capacitor && window.Capacitor.Plugins
@@ -17,63 +26,69 @@ function getSTT() {
 }
 
 async function speak(text) {
-
     if (!text) return;
-
     const tts = getTTS();
-
-    if (!tts) {
-        status.innerText = "Voice output not available";
-        return;
-    }
-
-    status.innerText = "Vamshi speaking...";
-
+    if (!tts) return;
     try {
-        await tts.speak({
-            text: String(text),
-            lang: "en-US",
-            rate: 1.0,
-            pitch: 1.0,
-            volume: 1.0,
-        });
+        await tts.speak({ text: String(text), lang: "en-US", rate: 1.0, pitch: 1.0, volume: 1.0 });
     } catch (err) {
         console.error(err);
     }
-
-    status.innerText = "Vamshi ready";
-
 }
 
-startBtn.addEventListener("click", () => {
+async function sendToVamshi(text) {
+    if (!text || !text.trim()) return;
 
-    status.innerText = "Vamshi is online";
+    addBubble("user", text);
+    statusEl.textContent = "Thinking...";
 
-    speak("Hello Rakesh. Vamshi is online.");
+    const thinkingBubble = addBubble("assistant", "Vamshi is typing...", true);
 
+    let reply;
+    try {
+        reply = await VamshiBrain(text.toLowerCase());
+    } catch (err) {
+        reply = "Sorry, something went wrong.";
+    }
+
+    thinkingBubble.remove();
+    addBubble("assistant", String(reply));
+    statusEl.textContent = "Ready";
+
+    speak(String(reply));
+}
+
+sendBtn.addEventListener("click", () => {
+    const text = textInput.value;
+    textInput.value = "";
+    sendToVamshi(text);
 });
 
-listenBtn.addEventListener("click", async () => {
+textInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+        const text = textInput.value;
+        textInput.value = "";
+        sendToVamshi(text);
+    }
+});
 
+micBtn.addEventListener("click", async () => {
     const stt = getSTT();
 
     if (!stt) {
-        status.innerText = "Voice input not available";
-        speak("Sorry Rakesh, voice input is not available.");
+        statusEl.textContent = "Voice input not available";
         return;
     }
 
     try {
-
         const permission = await stt.requestPermissions();
-
         if (permission.speechRecognition !== "granted") {
-            status.innerText = "Microphone permission denied";
-            speak("Sorry Rakesh, I need microphone permission.");
+            statusEl.textContent = "Microphone permission denied";
             return;
         }
 
-        status.innerText = "Listening...";
+        micBtn.classList.add("listening");
+        statusEl.textContent = "Listening...";
 
         const result = await stt.start({
             language: "en-US",
@@ -82,34 +97,20 @@ listenBtn.addEventListener("click", async () => {
             popup: false,
         });
 
-        const text = result && result.matches && result.matches[0]
-            ? result.matches[0]
-            : "";
+        micBtn.classList.remove("listening");
+        statusEl.textContent = "Ready";
 
-        if (!text) {
-            status.innerText = "Didn't catch that";
-            return;
+        const text = result && result.matches && result.matches[0] ? result.matches[0] : "";
+        if (text) {
+            sendToVamshi(text);
         }
 
-        userText.innerText = "You: " + text;
-
-        status.innerText = "Thinking...";
-
-        const reply = await VamshiBrain(text.toLowerCase());
-
-        userText.innerText =
-            "You: " + text + "\n\nVamshi: " + String(reply);
-
-        await speak(String(reply));
-
     } catch (error) {
-
+        micBtn.classList.remove("listening");
+        statusEl.textContent = "Ready";
         console.error(error);
-
-        status.innerText = "Voice error";
-
-        speak("Sorry Rakesh. I could not hear you.");
-
     }
-
 });
+
+// Opening greeting
+addBubble("assistant", "Hello Rakesh. I'm Vamshi — type or tap the mic to talk to me.");
