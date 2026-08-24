@@ -16,41 +16,33 @@
 
 <body>
 
-    <div class="container">
+    <div class="app">
 
-        <div class="jarvis-core">
-
-            <div class="ring ring1"></div>
-
-            <div class="ring ring2"></div>
-
-            <div class="ring ring3"></div>
-
-            <div class="center-core"></div>
-
+        <div class="chat-header">
+            <div class="header-title">
+                <span class="header-dot"></span>
+                Vamshi AI
+            </div>
+            <div class="header-status" id="status">Ready</div>
         </div>
 
-        <h1>VAMSHI AI</h1>
+        <div class="chat-messages" id="chatMessages"></div>
 
-        <p id="status">System Offline</p>
-
-        <button id="startBtn">
-
-            Start Vamshi
-
-        </button>
-
-        <button id="listenBtn">
-
-            🎤 Listen
-
-        </button>
-
-        <p id="userText">
-
-            Waiting for voice...
-
-        </p>
+        <div class="chat-input-bar">
+            <input
+                type="text"
+                id="textInput"
+                class="text-input"
+                placeholder="Message Vamshi..."
+                autocomplete="off"
+            />
+            <button type="button" id="micBtn" class="icon-btn" aria-label="Voice input">
+                🎤
+            </button>
+            <button type="button" id="sendBtn" class="icon-btn send-btn" aria-label="Send">
+                ➤
+            </button>
+        </div>
 
     </div>
 
