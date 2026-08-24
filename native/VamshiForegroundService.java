@@ -196,6 +196,9 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         restartListeningSoon();
     }
 
+    // IMPORTANT: order matters here. Specific commands (call, open) are
+    // checked BEFORE the loose greeting check, so a word that happens to
+    // contain "hi" or "hey" inside it doesn't hijack a real command.
     private void handleCommand(String command) {
 
         if (command.isEmpty()) {
@@ -205,33 +208,45 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             return;
         }
 
-        if (command.contains("hello") || command.contains("hi") || command.contains("hey")) {
-            speak("Hello Rakesh. I am Vamshi.");
-            restartListeningSoon();
-        } else if (command.contains("time")) {
+        if (command.contains("call ")) {
+            String spokenName = command.substring(command.indexOf("call ") + 5).trim();
+            handleCallCommand(spokenName);
+            return;
+        }
+
+        if (command.equals("call") || command.startsWith("call")) {
+            handleCallCommand("");
+            return;
+        }
+
+        if (command.startsWith("open ")) {
+            String appName = command.substring(5).trim();
+            openAnyApp(appName);
+            return;
+        }
+
+        if (command.equals("time") || command.contains("what time") || command.contains("the time")) {
             String time = DateFormat.getTimeInstance(DateFormat.SHORT).format(new Date());
             speak("The current time is " + time);
             restartListeningSoon();
-        } else if (command.contains("date") || command.contains("today")) {
+            return;
+        }
+
+        if (command.equals("date") || command.contains("today") || command.contains("what date")) {
             String date = DateFormat.getDateInstance(DateFormat.FULL).format(new Date());
             speak("Today is " + date);
             restartListeningSoon();
-        } else if (command.contains("open whatsapp")) {
-            launchAppByName("com.whatsapp", "whatsapp");
-        } else if (command.contains("open instagram")) {
-            launchAppByName("com.instagram.android", "instagram");
-        } else if (command.contains("open youtube")) {
-            launchAppByName("com.google.android.youtube", "youtube");
-        } else if (command.contains("open calculator")) {
-            launchAppByName("com.google.android.calculator", "calculator");
-        } else if (command.contains("call ")) {
-            String spokenName = command.substring(command.indexOf("call ") + 5).trim();
-            handleCallCommand(spokenName);
-        } else if (command.equals("call") || command.startsWith("call")) {
-            handleCallCommand("");
-        } else {
-            askAINative(command);
+            return;
         }
+
+        if (command.equals("hi") || command.equals("hello") || command.equals("hey")
+                || command.startsWith("hi ") || command.startsWith("hello ") || command.startsWith("hey ")) {
+            speak("Hello Rakesh. I am Vamshi.");
+            restartListeningSoon();
+            return;
+        }
+
+        askAINative(command);
     }
 
     private void handleCallCommand(String spokenName) {
@@ -267,16 +282,30 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         restartListeningSoon();
     }
 
-    private void launchAppByName(String packageName, String label) {
-        boolean opened;
+    private void openAnyApp(String spokenAppName) {
 
-        if (VamshiAccessibilityService.isRunning()) {
-            opened = VamshiAccessibilityService.launchApp(packageName);
-        } else {
-            opened = AppLauncherUtil.launch(this, packageName);
+        if (spokenAppName.isEmpty()) {
+            speak("Which app do you want to open?");
+            restartListeningSoon();
+            return;
         }
 
-        speak(opened ? "Opening " + label : label + " is not installed.");
+        AppLauncherUtil.AppEntry match = AppLauncherUtil.findBestMatch(this, spokenAppName);
+
+        if (match == null) {
+            speak("I could not find an app called " + spokenAppName);
+            restartListeningSoon();
+            return;
+        }
+
+        boolean opened;
+        if (VamshiAccessibilityService.isRunning()) {
+            opened = VamshiAccessibilityService.launchApp(match.packageName);
+        } else {
+            opened = AppLauncherUtil.launch(this, match.packageName);
+        }
+
+        speak(opened ? "Opening " + match.label : "Sorry, I could not open " + match.label);
         restartListeningSoon();
     }
 
