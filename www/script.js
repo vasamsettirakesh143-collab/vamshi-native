@@ -3,6 +3,10 @@ const statusEl = document.getElementById("status");
 const textInput = document.getElementById("textInput");
 const micBtn = document.getElementById("micBtn");
 const sendBtn = document.getElementById("sendBtn");
+const attachBtn = document.getElementById("attachBtn");
+const fileInput = document.getElementById("fileInput");
+
+let selectedFile = null;
 
 function addBubble(sender, text, isThinking) {
     const bubble = document.createElement("div");
@@ -27,10 +31,19 @@ function getSTT() {
 
 async function speak(text) {
     if (!text) return;
+
     const tts = getTTS();
+
     if (!tts) return;
+
     try {
-        await tts.speak({ text: String(text), lang: "en-US", rate: 1.0, pitch: 1.0, volume: 1.0 });
+        await tts.speak({
+            text: String(text),
+            lang: "en-US",
+            rate: 1.0,
+            pitch: 1.0,
+            volume: 1.0
+        });
     } catch (err) {
         console.error(err);
     }
@@ -42,9 +55,14 @@ async function sendToVamshi(text) {
     addBubble("user", text);
     statusEl.textContent = "Thinking...";
 
-    const thinkingBubble = addBubble("assistant", "Vamshi is typing...", true);
+    const thinkingBubble = addBubble(
+        "assistant",
+        "Vamshi is typing...",
+        true
+    );
 
     let reply;
+
     try {
         reply = await VamshiBrain(text.toLowerCase());
     } catch (err) {
@@ -52,23 +70,49 @@ async function sendToVamshi(text) {
     }
 
     thinkingBubble.remove();
+
     addBubble("assistant", String(reply));
     statusEl.textContent = "Ready";
 
     speak(String(reply));
 }
 
+attachBtn.addEventListener("click", () => {
+    fileInput.click();
+});
+
+fileInput.addEventListener("change", () => {
+    if (!fileInput.files || !fileInput.files.length) return;
+
+    selectedFile = fileInput.files[0];
+
+    statusEl.textContent = "Selected: " + selectedFile.name;
+
+    addBubble(
+        "user",
+        "📎 Attached: " + selectedFile.name
+    );
+});
+
 sendBtn.addEventListener("click", () => {
     const text = textInput.value;
+
     textInput.value = "";
-    sendToVamshi(text);
+
+    if (text.trim()) {
+        sendToVamshi(text);
+    }
 });
 
 textInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
         const text = textInput.value;
+
         textInput.value = "";
-        sendToVamshi(text);
+
+        if (text.trim()) {
+            sendToVamshi(text);
+        }
     }
 });
 
@@ -82,6 +126,7 @@ micBtn.addEventListener("click", async () => {
 
     try {
         const permission = await stt.requestPermissions();
+
         if (permission.speechRecognition !== "granted") {
             statusEl.textContent = "Microphone permission denied";
             return;
@@ -100,7 +145,13 @@ micBtn.addEventListener("click", async () => {
         micBtn.classList.remove("listening");
         statusEl.textContent = "Ready";
 
-        const text = result && result.matches && result.matches[0] ? result.matches[0] : "";
+        const text =
+            result &&
+            result.matches &&
+            result.matches[0]
+                ? result.matches[0]
+                : "";
+
         if (text) {
             sendToVamshi(text);
         }
@@ -113,4 +164,7 @@ micBtn.addEventListener("click", async () => {
 });
 
 // Opening greeting
-addBubble("assistant", "Hello Rakesh. I'm Vamshi — type or tap the mic to talk to me.");
+addBubble(
+    "assistant",
+    "Hello Rakesh. I'm Vamshi — type or tap the mic to talk to me."
+);
