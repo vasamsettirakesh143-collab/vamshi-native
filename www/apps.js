@@ -4,11 +4,9 @@ const APPS = {
     youtube: "com.google.android.youtube",
     calculator: "com.google.android.calculator",
     chrome: "com.android.chrome",
-    browser: "com.android.browser",
     maps: "com.google.android.apps.maps",
     gmail: "com.google.android.gm",
     photos: "com.google.android.apps.photos",
-    gallery: "com.google.android.apps.photos",
     camera: "com.android.camera2",
     settings: "com.android.settings",
     contacts: "com.google.android.contacts",
@@ -24,7 +22,6 @@ const APPS = {
     twitter: "com.twitter.android",
     x: "com.twitter.android",
     netflix: "com.netflix.mediaclient",
-    prime: "com.amazon.avod.thirdpartyclient",
     amazon: "in.amazon.mShop.android.shopping",
     linkedin: "com.linkedin.android"
 };
@@ -39,14 +36,24 @@ const APP_ALIASES = {
 
 async function openApp(appName) {
     const name = String(appName || "").toLowerCase().trim();
+    const launcher = window.Capacitor?.Plugins?.AppLauncherNative;
+
+    // This searches every installed app with a launcher icon.
+    if (launcher?.findAndLaunch) {
+        try {
+            const result = await launcher.findAndLaunch({ name });
+            return "Opening " + (result.label || name) + ".";
+        } catch (error) {
+            console.warn("Dynamic app search did not match.", error);
+        }
+    }
+
     const alias = APP_ALIASES[name] || name;
     const packageName = APPS[alias] || alias;
 
     if (!packageName || !packageName.includes(".")) {
-        return "Sorry, I do not know how to open " + name + " yet.";
+        return "Sorry, I could not find an installed app called " + name + ".";
     }
-
-    const launcher = window.Capacitor?.Plugins?.AppLauncherNative;
 
     if (!launcher) {
         return "App launching works only inside the installed Vamshi app.";
@@ -77,17 +84,7 @@ async function openYouTubeSearch(query) {
     const value = String(query || "").trim();
     if (!value) return "What should I search for on YouTube?";
 
-    try {
-        await openApp("youtube");
-    } catch (error) {
-        console.error(error);
-    }
-
-    window.open(
-        "https://www.youtube.com/results?search_query=" + encodeURIComponent(value ),
-        "_blank"
-    );
-
+    await openApp("youtube");
     return "Searching YouTube for " + value + ".";
 }
 
@@ -119,9 +116,7 @@ function findAppName(command) {
             command.includes("open " + name) ||
             command.includes("launch " + name) ||
             command.includes("start " + name)
-        ) {
-            return name;
-        }
+        ) return name;
     }
 
     for (const alias of Object.keys(APP_ALIASES)) {
@@ -129,9 +124,7 @@ function findAppName(command) {
             command.includes("open " + alias) ||
             command.includes("launch " + alias) ||
             command.includes("start " + alias)
-        ) {
-            return alias;
-        }
+        ) return alias;
     }
 
     return null;
