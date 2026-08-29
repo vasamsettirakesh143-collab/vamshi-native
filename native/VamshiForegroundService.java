@@ -311,6 +311,50 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
         restartListeningSoon();
     }
+    private void searchYouTube(String query) {
+
+    try {
+        String encodedQuery = Uri.encode(query);
+
+        Uri youtubeUri = Uri.parse(
+                "https://www.youtube.com/results?search_query="
+                        + encodedQuery
+        );
+
+        Intent youtubeIntent = new Intent(
+                Intent.ACTION_VIEW,
+                youtubeUri
+        );
+
+        youtubeIntent.setPackage("com.google.android.youtube");
+        youtubeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+        if (youtubeIntent.resolveActivity(getPackageManager()) != null) {
+
+            startActivity(youtubeIntent);
+            speak("Opening YouTube and searching for " + query);
+
+        } else {
+
+            Intent fallbackIntent = new Intent(
+                    Intent.ACTION_VIEW,
+                    youtubeUri
+            );
+
+            fallbackIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(fallbackIntent);
+
+            speak("Searching YouTube for " + query);
+        }
+
+    } catch (Exception e) {
+
+        speak("YouTube search error: "
+                + e.getClass().getSimpleName());
+    }
+
+    restartListeningSoon();
+}
 
     private void handleCommand(String command) {
 
@@ -327,6 +371,25 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
         if (command.startsWith("open maps")
                 && command.contains("navigate to")) {
+            // YouTube search command:
+// "Open YouTube and search for [something]"
+if (command.startsWith("open youtube")
+        && command.contains("search for")) {
+
+    String query = command.substring(
+            command.indexOf("search for")
+                    + "search for".length()
+    ).trim();
+
+    if (query.isEmpty()) {
+        speak("What would you like to search for on YouTube?");
+        restartListeningSoon();
+        return;
+    }
+
+    searchYouTube(query);
+    return;
+}
 
             String destination =
                     command.substring(
