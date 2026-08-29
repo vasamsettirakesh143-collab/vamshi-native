@@ -316,6 +316,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     try {
         String encodedQuery = Uri.encode(query);
 
+        // YouTube's app-specific search URI
         Uri youtubeUri = Uri.parse(
                 "https://www.youtube.com/results?search_query="
                         + encodedQuery
@@ -326,26 +327,13 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                 youtubeUri
         );
 
+        // Try opening the search result directly in YouTube
         youtubeIntent.setPackage("com.google.android.youtube");
         youtubeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
-        if (youtubeIntent.resolveActivity(getPackageManager()) != null) {
+        startActivity(youtubeIntent);
 
-            startActivity(youtubeIntent);
-            speak("Opening YouTube and searching for " + query);
-
-        } else {
-
-            Intent fallbackIntent = new Intent(
-                    Intent.ACTION_VIEW,
-                    youtubeUri
-            );
-
-            fallbackIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(fallbackIntent);
-
-            speak("Searching YouTube for " + query);
-        }
+        speak("Searching YouTube for " + query);
 
     } catch (Exception e) {
 
