@@ -1,152 +1,72 @@
 async function VamshiBrain(command) {
+    command = String(command || "").toLowerCase().trim();
 
-    command = command.toLowerCase().trim();
+    if (!command) return "How can I help you?";
 
-    let memoryReply = remember(command);
+    const memoryReply = typeof remember === "function" ? remember(command) : null;
+    if (memoryReply) return memoryReply;
 
-    if (memoryReply) {
+    const recallReply = typeof recall === "function" ? recall(command) : null;
+    if (recallReply) return recallReply;
 
-        return memoryReply;
+    const jarvisReply = typeof tryJarvisCommand === "function"
+        ? await tryJarvisCommand(command)
+        : null;
 
-    }
+    if (jarvisReply) return jarvisReply;
 
-    let recallReply = recall(command);
-
-    if (recallReply) {
-
-        return recallReply;
-
-    }
-
-    // Open apps — checked early and specifically, so a command like
-    // "open whatsapp and tell me the time" still opens WhatsApp.
-
-    if (command.includes("open whatsapp")) {
-
-        return openApp("whatsapp");
-
-    }
-
-    else if (command.includes("open instagram")) {
-
-        return openApp("instagram");
-
-    }
-
-    else if (command.includes("open youtube")) {
-
-        return openApp("youtube");
-
-    }
-
-    else if (command.includes("open calculator")) {
-
-        return openApp("calculator");
-
-    }
-
-    // Time / date — specific phrasing, not just the bare word, so a
-    // sentence that happens to mention "time" isn't misread.
-
-    else if (
-
+    if (
         command === "time" ||
         command.includes("what time") ||
         command.includes("the time") ||
         command.includes("what's the time")
-
     ) {
-
-        return "The current time is " +
-
-            new Date().toLocaleTimeString();
-
+        return "The current time is " + new Date().toLocaleTimeString();
     }
 
-    else if (
-
+    if (
         command === "date" ||
         command.includes("today's date") ||
         command.includes("what date") ||
         command.includes("what's today")
-
     ) {
-
-        return "Today is " +
-
-            new Date().toDateString();
-
+        return "Today is " + new Date().toDateString();
     }
 
-    // Greeting — ONLY matches when the message actually IS a greeting
-    // (starts with it, or is just that word alone), never when the word
-    // merely appears somewhere inside a longer sentence.
-
-    else if (
-
-        command === "hi" || command === "hello" || command === "hey" ||
-        command.startsWith("hi ") || command.startsWith("hello ") || command.startsWith("hey ")
-
+    if (
+        command === "hi" ||
+        command === "hello" ||
+        command === "hey" ||
+        command.startsWith("hi ") ||
+        command.startsWith("hello ") ||
+        command.startsWith("hey ")
     ) {
-
         return "Hello Rakesh. I am Vamshi.";
-
     }
 
-    // Everything else — including code requests, general questions —
-    // goes to the real AI backend.
-
-    else {
-
-        return await askAI(command);
-
-    }
-
+    return await askAI(command);
 }
 
-
-// AI function
-
 async function askAI(message) {
-
     try {
-
         const response = await fetch(
-
             "https://vamshi-backend-y6ja.onrender.com/chat",
-
             {
-
                 method: "POST",
-
                 headers: {
-
                     "Content-Type": "application/json"
-
                 },
-
-                body: JSON.stringify({
-
-                    message: message
-
-                })
-
+                body: JSON.stringify({ message } )
             }
-
         );
 
         const data = await response.json();
-
-        return data.reply;
-
-    }
-
-    catch (error) {
-
-        console.error(error);
-
+        return data.reply || "I could not create a reply.";
+    } catch (error) {
+        console.error("AI connection error:", error);
         return "Sorry Rakesh, I cannot connect to my brain.";
-
     }
-
 }
+
+window.VamshiBrain = VamshiBrain;
+window.askAI = askAI;
