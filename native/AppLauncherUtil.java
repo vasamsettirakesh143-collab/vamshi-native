@@ -12,16 +12,16 @@ import java.util.Locale;
 public class AppLauncherUtil {
 
     public static boolean launch(Context context, String packageName) {
-        PackageManager pm = context.getPackageManager();
-        Intent launchIntent = pm.getLaunchIntentForPackage(packageName);
+        PackageManager packageManager = context.getPackageManager();
+        Intent launchIntent = packageManager.getLaunchIntentForPackage(packageName);
 
-        if (launchIntent != null) {
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            context.startActivity(launchIntent);
-            return true;
+        if (launchIntent == null) {
+            return false;
         }
 
-        return false;
+        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        context.startActivity(launchIntent);
+        return true;
     }
 
     public static class AppEntry {
@@ -34,18 +34,17 @@ public class AppLauncherUtil {
         }
     }
 
-    // Every app on the phone that has its own launcher icon.
     public static List<AppEntry> getLaunchableApps(Context context) {
         List<AppEntry> result = new ArrayList<>();
-        PackageManager pm = context.getPackageManager();
+        PackageManager packageManager = context.getPackageManager();
 
         Intent mainIntent = new Intent(Intent.ACTION_MAIN, null);
         mainIntent.addCategory(Intent.CATEGORY_LAUNCHER);
 
-        List<ResolveInfo> apps = pm.queryIntentActivities(mainIntent, 0);
+        List<ResolveInfo> apps = packageManager.queryIntentActivities(mainIntent, 0);
 
         for (ResolveInfo info : apps) {
-            String label = info.loadLabel(pm).toString();
+            String label = info.loadLabel(packageManager).toString();
             String packageName = info.activityInfo.packageName;
             result.add(new AppEntry(label, packageName));
         }
@@ -53,14 +52,13 @@ public class AppLauncherUtil {
         return result;
     }
 
-    // Given something the user said (e.g. "telegram"), find the
-    // installed app whose real name best matches it.
     public static AppEntry findBestMatch(Context context, String spokenName) {
         String query = spokenName.toLowerCase(Locale.US).trim();
-        if (query.isEmpty()) return null;
+        if (query.isEmpty()) {
+            return null;
+        }
 
         List<AppEntry> apps = getLaunchableApps(context);
-
         AppEntry bestMatch = null;
         int bestScore = Integer.MAX_VALUE;
 
@@ -73,6 +71,7 @@ public class AppLauncherUtil {
 
             if (label.contains(query) || query.contains(label)) {
                 int score = Math.abs(label.length() - query.length());
+
                 if (score < bestScore) {
                     bestScore = score;
                     bestMatch = app;
