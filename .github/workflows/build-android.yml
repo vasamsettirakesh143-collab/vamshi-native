@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -32,6 +33,7 @@ jobs:
         run: |
           python3 - <<'EOF'
           path = "android/app/src/main/AndroidManifest.xml"
+
           with open(path) as f:
               content = f.read()
 
@@ -43,6 +45,7 @@ jobs:
             <uses-permission android:name="android.permission.CALL_PHONE" />
             <uses-permission android:name="android.permission.READ_CONTACTS" />
           '''
+
           content = content.replace(
               "<application",
               permissions + '\n    <application\n        android:name=".VamshiApp"',
@@ -50,14 +53,6 @@ jobs:
           )
 
           service_decl = '''    <service
-                android:name=".VamshiForegroundService"
-                android:exported="false"
-                android:foregroundServiceType="microphone|specialUse">
-                <property
-                    android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                    android:value="voice_assistant_keepalive" />
-            </service>
-            <service
                 android:name=".VamshiAccessibilityService"
                 android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
                 android:exported="false">
@@ -77,27 +72,22 @@ jobs:
                 </intent-filter>
             </service>
           </application>'''
-          content = content.replace("</application>", service_decl)
+
+          content = content.replace("</application>", service_decl, 1)
 
           queries = '''  <queries>
               <intent>
                   <action android:name="android.intent.action.MAIN" />
                   <category android:name="android.intent.category.LAUNCHER" />
               </intent>
-              <package android:name="com.whatsapp" />
-              <package android:name="com.instagram.android" />
-              <package android:name="com.google.android.youtube" />
-              <package android:name="com.google.android.calculator" />
-            </queries>
+          </queries>
           </manifest>'''
-          content = content.replace("</manifest>", queries)
+
+          content = content.replace("</manifest>", queries, 1)
 
           with open(path, "w") as f:
               f.write(content)
           EOF
-
-      - name: Show manifest for debugging
-        run: cat android/app/src/main/AndroidManifest.xml
 
       - name: Sync web assets into the native project
         run: npx cap sync android
@@ -105,6 +95,7 @@ jobs:
       - name: Inject native plugins and resources
         run: |
           mkdir -p android/app/src/main/java/com/vamshi/ai
+
           cp native/AppLauncherUtil.java android/app/src/main/java/com/vamshi/ai/AppLauncherUtil.java
           cp native/AppLauncherNativePlugin.java android/app/src/main/java/com/vamshi/ai/AppLauncherNativePlugin.java
           cp native/CallUtil.java android/app/src/main/java/com/vamshi/ai/CallUtil.java
@@ -114,8 +105,29 @@ jobs:
           cp native/VamshiNotificationListenerService.java android/app/src/main/java/com/vamshi/ai/VamshiNotificationListenerService.java
           cp native/VamshiApp.java android/app/src/main/java/com/vamshi/ai/VamshiApp.java
           cp native/MainActivity.java android/app/src/main/java/com/vamshi/ai/MainActivity.java
+
           mkdir -p android/app/src/main/res/xml
           cp native/accessibility_service_config.xml android/app/src/main/res/xml/accessibility_service_config.xml
+
+          python3 - <<'EOF'
+          from pathlib import Path
+
+          java_folder = Path("android/app/src/main/java/com/vamshi/ai")
+
+          for java_file in java_folder.glob("*.java"):
+              source = java_file.read_text()
+
+              if not source.lstrip().startswith("package "):
+                  java_file.write_text(
+                      "package com.vamshi.ai;\n\n" + source
+                  )
+          EOF
+
+      - name: Verify Java package declarations
+        run: |
+          head -n 3 android/app/src/main/java/com/vamshi/ai/MainActivity.java
+          head -n 3 android/app/src/main/java/com/vamshi/ai/AppLauncherNativePlugin.java
+          head -n 3 android/app/src/main/java/com/vamshi/ai/AppLauncherUtil.java
 
       - name: Build debug APK
         working-directory: android
