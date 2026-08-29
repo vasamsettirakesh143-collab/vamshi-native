@@ -16,6 +16,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
@@ -57,17 +58,21 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
+
         handler = new Handler(Looper.getMainLooper());
-        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+
+        audioManager =
+                (AudioManager) getSystemService(Context.AUDIO_SERVICE);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
 
-        boolean hasMic = ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED;
+        boolean hasMic =
+                ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.RECORD_AUDIO
+                ) == PackageManager.PERMISSION_GRANTED;
 
         Notification notification = buildNotification();
 
@@ -77,14 +82,24 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                     ? ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
                     : ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE;
 
-            startForeground(NOTIFICATION_ID, notification, type);
+            startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    type
+            );
 
         } else {
-            startForeground(NOTIFICATION_ID, notification);
+
+            startForeground(
+                    NOTIFICATION_ID,
+                    notification
+            );
         }
 
         if (hasMic && !listeningEnabled) {
+
             listeningEnabled = true;
+
             initTextToSpeech();
             initSpeechRecognizer();
         }
@@ -96,11 +111,12 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID,
-                    "Vamshi AI",
-                    NotificationManager.IMPORTANCE_LOW
-            );
+            NotificationChannel channel =
+                    new NotificationChannel(
+                            CHANNEL_ID,
+                            "Vamshi AI",
+                            NotificationManager.IMPORTANCE_LOW
+                    );
 
             channel.setDescription(
                     "Keeps Vamshi listening in the background"
@@ -117,19 +133,26 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
     private Notification buildNotification() {
 
-        Intent openAppIntent = new Intent(this, MainActivity.class);
+        Intent openAppIntent =
+                new Intent(this, MainActivity.class);
 
-        PendingIntent pendingIntent = PendingIntent.getActivity(
+        PendingIntent pendingIntent =
+                PendingIntent.getActivity(
+                        this,
+                        0,
+                        openAppIntent,
+                        PendingIntent.FLAG_IMMUTABLE
+                );
+
+        return new NotificationCompat.Builder(
                 this,
-                0,
-                openAppIntent,
-                PendingIntent.FLAG_IMMUTABLE
-        );
-
-        return new NotificationCompat.Builder(this, CHANNEL_ID)
+                CHANNEL_ID
+        )
                 .setContentTitle("Vamshi AI")
                 .setContentText("Listening for \"Vamshi\"...")
-                .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+                .setSmallIcon(
+                        android.R.drawable.ic_btn_speak_now
+                )
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .build();
@@ -137,13 +160,20 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
     private void initTextToSpeech() {
 
-        textToSpeech = new TextToSpeech(this, status -> {
+        textToSpeech =
+                new TextToSpeech(
+                        this,
+                        status -> {
 
-            if (status == TextToSpeech.SUCCESS && textToSpeech != null) {
-                textToSpeech.setLanguage(Locale.US);
-            }
+                            if (status == TextToSpeech.SUCCESS
+                                    && textToSpeech != null) {
 
-        });
+                                textToSpeech.setLanguage(
+                                        Locale.US
+                                );
+                            }
+                        }
+                );
     }
 
     private void initSpeechRecognizer() {
@@ -166,13 +196,21 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             return;
         }
 
-        if (audioManager != null && audioManager.isMusicActive()) {
-            handler.postDelayed(this::startListening, 2000);
+        if (audioManager != null
+                && audioManager.isMusicActive()) {
+
+            handler.postDelayed(
+                    this::startListening,
+                    2000
+            );
+
             return;
         }
 
         Intent recognizerIntent =
-                new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                new Intent(
+                        RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+                );
 
         recognizerIntent.putExtra(
                 RecognizerIntent.EXTRA_LANGUAGE_MODEL,
@@ -204,11 +242,17 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                 3000
         );
 
-        speechRecognizer.startListening(recognizerIntent);
+        speechRecognizer.startListening(
+                recognizerIntent
+        );
     }
 
     private void restartListeningSoon() {
-        handler.postDelayed(this::startListening, 500);
+
+        handler.postDelayed(
+                this::startListening,
+                500
+        );
     }
 
     @Override
@@ -220,32 +264,48 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                 );
 
         if (matches == null || matches.isEmpty()) {
+
             restartListeningSoon();
+
             return;
         }
 
-        String heard = matches.get(0).toLowerCase(Locale.US);
+        String heard =
+                matches.get(0)
+                        .toLowerCase(Locale.US);
 
         if (awaitingCallName) {
+
             awaitingCallName = false;
-            handleCallCommand(heard.trim());
+
+            handleCallCommand(
+                    heard.trim()
+            );
+
             return;
         }
 
         if (awaitingFollowUp) {
+
             awaitingFollowUp = false;
-            handleCommand(heard.trim());
+
+            handleCommand(
+                    heard.trim()
+            );
+
             return;
         }
 
         if (heard.contains("vamshi")) {
 
-            String command = heard
-                    .replace("hey vamshi", "")
-                    .replace("vamshi", "")
-                    .trim();
+            String command =
+                    heard
+                            .replace("hey vamshi", "")
+                            .replace("vamshi", "")
+                            .trim();
 
             handleCommand(command);
+
             return;
         }
 
@@ -255,57 +315,68 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     private void handleCommand(String command) {
 
         if (command.isEmpty()) {
+
             awaitingFollowUp = true;
+
             speak("Yes?");
+
             restartListeningSoon();
+
             return;
         }
 
-        /*
-         * SPECIAL MULTI-STEP COMMAND:
-         * "Open Maps and navigate to [place]"
-         *
-         * We handle this before the normal "open" command,
-         * otherwise the whole sentence would be treated as an app name.
-         */
         if (command.startsWith("open maps")
                 && command.contains("navigate to")) {
 
-            String destination = command.substring(
-                    command.indexOf("navigate to")
-                            + "navigate to".length()
-            ).trim();
+            String destination =
+                    command.substring(
+                            command.indexOf("navigate to")
+                                    + "navigate to".length()
+                    ).trim();
 
             if (destination.isEmpty()) {
-                speak("Where would you like to navigate?");
+
+                speak(
+                        "Where would you like to navigate?"
+                );
+
                 restartListeningSoon();
+
                 return;
             }
 
             navigateWithMaps(destination);
+
             return;
         }
 
         if (command.contains("call ")) {
 
-            String spokenName = command.substring(
-                    command.indexOf("call ") + 5
-            ).trim();
+            String spokenName =
+                    command.substring(
+                            command.indexOf("call ") + 5
+                    ).trim();
 
             handleCallCommand(spokenName);
+
             return;
         }
 
-        if (command.equals("call") || command.startsWith("call")) {
+        if (command.equals("call")
+                || command.startsWith("call")) {
+
             handleCallCommand("");
+
             return;
         }
 
         if (command.startsWith("open ")) {
 
-            String appName = command.substring(5).trim();
+            String appName =
+                    command.substring(5).trim();
 
             openAnyApp(appName);
+
             return;
         }
 
@@ -313,12 +384,22 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                 || command.contains("what time")
                 || command.contains("the time")) {
 
-            String time = DateFormat.getTimeInstance(
-                    DateFormat.SHORT
-            ).format(new Date());
+            String time =
+                    DateFormat
+                            .getTimeInstance(
+                                    DateFormat.SHORT
+                            )
+                            .format(
+                                    new Date()
+                            );
 
-            speak("The current time is " + time);
+            speak(
+                    "The current time is "
+                            + time
+            );
+
             restartListeningSoon();
+
             return;
         }
 
@@ -326,12 +407,22 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                 || command.contains("today")
                 || command.contains("what date")) {
 
-            String date = DateFormat.getDateInstance(
-                    DateFormat.FULL
-            ).format(new Date());
+            String date =
+                    DateFormat
+                            .getDateInstance(
+                                    DateFormat.FULL
+                            )
+                            .format(
+                                    new Date()
+                            );
 
-            speak("Today is " + date);
+            speak(
+                    "Today is "
+                            + date
+            );
+
             restartListeningSoon();
+
             return;
         }
 
@@ -342,19 +433,18 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                 || command.startsWith("hello ")
                 || command.startsWith("hey ")) {
 
-            speak("Hello Rakesh. I am Vamshi.");
+            speak(
+                    "Hello Rakesh. I am Vamshi."
+            );
+
             restartListeningSoon();
+
             return;
         }
 
         askAINative(command);
     }
 
-    /**
-     * Opens Google Maps with a destination/search request.
-     * This uses Android's Maps URI instead of depending on
-     * the visible button layout inside the Maps application.
-     */
     private void navigateWithMaps(String destination) {
 
         try {
@@ -362,14 +452,17 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             String encodedDestination =
                     Uri.encode(destination);
 
-            Uri mapsUri = Uri.parse(
-                    "google.navigation:q=" + encodedDestination
-            );
+            Uri mapsUri =
+                    Uri.parse(
+                            "google.navigation:q="
+                                    + encodedDestination
+                    );
 
-            Intent mapsIntent = new Intent(
-                    Intent.ACTION_VIEW,
-                    mapsUri
-            );
+            Intent mapsIntent =
+                    new Intent(
+                            Intent.ACTION_VIEW,
+                            mapsUri
+                    );
 
             mapsIntent.setPackage(
                     "com.google.android.apps.maps"
@@ -383,47 +476,63 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                     getPackageManager()
             ) != null) {
 
-                startActivity(mapsIntent);
+                startActivity(
+                        mapsIntent
+                );
 
-                speak("Opening Maps and navigating to "
-                        + destination);
+                speak(
+                        "Opening Maps and navigating to "
+                                + destination
+                );
 
             } else {
 
-                // Fallback: let Android handle the map request.
-                Intent fallbackIntent = new Intent(
-                        Intent.ACTION_VIEW,
-                        mapsUri
-                );
+                Intent fallbackIntent =
+                        new Intent(
+                                Intent.ACTION_VIEW,
+                                mapsUri
+                        );
 
                 fallbackIntent.addFlags(
                         Intent.FLAG_ACTIVITY_NEW_TASK
                 );
 
-                startActivity(fallbackIntent);
+                startActivity(
+                        fallbackIntent
+                );
 
-                speak("Opening navigation for "
-                        + destination);
+                speak(
+                        "Opening navigation for "
+                                + destination
+                );
             }
 
         } catch (Exception e) {
 
-            speak("Navigation error: "
-                    + e.getClass().getSimpleName());
-
+            speak(
+                    "Navigation error: "
+                            + e.getClass()
+                            .getSimpleName()
+            );
         }
 
         restartListeningSoon();
     }
 
-    private void handleCallCommand(String spokenName) {
+    private void handleCallCommand(
+            String spokenName
+    ) {
 
         if (spokenName.isEmpty()) {
 
-            speak("Who do you want to call?");
+            speak(
+                    "Who do you want to call?"
+            );
 
             awaitingCallName = true;
+
             restartListeningSoon();
+
             return;
         }
 
@@ -439,11 +548,15 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                         Manifest.permission.CALL_PHONE
                 ) == PackageManager.PERMISSION_GRANTED;
 
-        if (!hasContactsPermission || !hasCallPermission) {
+        if (!hasContactsPermission
+                || !hasCallPermission) {
 
-            speak("I don't have permission to make calls yet. Please open the app and grant the contacts and phone permissions.");
+            speak(
+                    "I don't have permission to make calls yet. Please open the app and grant the contacts and phone permissions."
+            );
 
             restartListeningSoon();
+
             return;
         }
 
@@ -457,42 +570,55 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
             if (contact == null) {
 
-                speak("I could not find a contact named "
-                        + spokenName);
+                speak(
+                        "I could not find a contact named "
+                                + spokenName
+                );
 
                 restartListeningSoon();
+
                 return;
             }
 
-            boolean called = CallUtil.placeCall(
-                    this,
-                    contact.number
-            );
+            boolean called =
+                    CallUtil.placeCall(
+                            this,
+                            contact.number
+                    );
 
             speak(
                     called
-                            ? "Calling " + contact.name
+                            ? "Calling "
+                            + contact.name
                             : "Sorry, I could not place the call."
             );
 
         } catch (Exception e) {
 
-            speak("Call error: "
-                    + e.getClass().getSimpleName()
-                    + " "
-                    + e.getMessage());
+            speak(
+                    "Call error: "
+                            + e.getClass()
+                            .getSimpleName()
+                            + " "
+                            + e.getMessage()
+            );
         }
 
         restartListeningSoon();
     }
 
-    private void openAnyApp(String spokenAppName) {
+    private void openAnyApp(
+            String spokenAppName
+    ) {
 
         if (spokenAppName.isEmpty()) {
 
-            speak("Which app do you want to open?");
+            speak(
+                    "Which app do you want to open?"
+            );
 
             restartListeningSoon();
+
             return;
         }
 
@@ -506,10 +632,13 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
             if (match == null) {
 
-                speak("I could not find an app called "
-                        + spokenAppName);
+                speak(
+                        "I could not find an app called "
+                                + spokenAppName
+                );
 
                 restartListeningSoon();
+
                 return;
             }
 
@@ -518,37 +647,45 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             if (VamshiAccessibilityService.isRunning()) {
 
                 opened =
-                        VamshiAccessibilityService.launchApp(
-                                match.packageName
-                        );
+                        VamshiAccessibilityService
+                                .launchApp(
+                                        match.packageName
+                                );
 
             } else {
 
-                opened = AppLauncherUtil.launch(
-                        this,
-                        match.packageName
-                );
+                opened =
+                        AppLauncherUtil.launch(
+                                this,
+                                match.packageName
+                        );
             }
 
             speak(
                     opened
-                            ? "Opening " + match.label
+                            ? "Opening "
+                            + match.label
                             : "Sorry, I could not open "
-                                    + match.label
+                            + match.label
             );
 
         } catch (Exception e) {
 
-            speak("Open app error: "
-                    + e.getClass().getSimpleName()
-                    + " "
-                    + e.getMessage());
+            speak(
+                    "Open app error: "
+                            + e.getClass()
+                            .getSimpleName()
+                            + " "
+                            + e.getMessage()
+            );
         }
 
         restartListeningSoon();
     }
 
-    private void askAINative(String message) {
+    private void askAINative(
+            String message
+    ) {
 
         new Thread(() -> {
 
@@ -556,12 +693,18 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
             try {
 
-                URL url = new URL(BACKEND_URL);
+                URL url =
+                        new URL(
+                                BACKEND_URL
+                        );
 
                 HttpURLConnection conn =
-                        (HttpURLConnection) url.openConnection();
+                        (HttpURLConnection)
+                                url.openConnection();
 
-                conn.setRequestMethod("POST");
+                conn.setRequestMethod(
+                        "POST"
+                );
 
                 conn.setRequestProperty(
                         "Content-Type",
@@ -569,21 +712,37 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                 );
 
                 conn.setDoOutput(true);
-                conn.setConnectTimeout(45000);
-                conn.setReadTimeout(45000);
 
-                JSONObject body = new JSONObject();
-                body.put("message", message);
+                conn.setConnectTimeout(
+                        45000
+                );
 
-                OutputStream os = conn.getOutputStream();
+                conn.setReadTimeout(
+                        45000
+                );
+
+                JSONObject body =
+                        new JSONObject();
+
+                body.put(
+                        "message",
+                        message
+                );
+
+                OutputStream os =
+                        conn.getOutputStream();
 
                 os.write(
-                        body.toString().getBytes("UTF-8")
+                        body.toString()
+                                .getBytes(
+                                        "UTF-8"
+                                )
                 );
 
                 os.close();
 
-                int statusCode = conn.getResponseCode();
+                int statusCode =
+                        conn.getResponseCode();
 
                 BufferedReader br =
                         new BufferedReader(
@@ -594,11 +753,15 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                                 )
                         );
 
-                StringBuilder sb = new StringBuilder();
+                StringBuilder sb =
+                        new StringBuilder();
 
                 String line;
 
-                while ((line = br.readLine()) != null) {
+                while (
+                        (line = br.readLine())
+                                != null
+                ) {
                     sb.append(line);
                 }
 
@@ -606,41 +769,55 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
                 if (statusCode >= 400) {
 
-                    reply = "Backend returned error code "
-                            + statusCode;
+                    reply =
+                            "Backend returned error code "
+                                    + statusCode;
 
                 } else {
 
                     JSONObject respJson =
-                            new JSONObject(sb.toString());
+                            new JSONObject(
+                                    sb.toString()
+                            );
 
-                    reply = respJson.optString(
-                            "reply",
-                            "Sorry, I could not get a reply."
-                    );
+                    reply =
+                            respJson.optString(
+                                    "reply",
+                                    "Sorry, I could not get a reply."
+                            );
                 }
 
-            } catch (java.net.SocketTimeoutException e) {
+            } catch (
+                    java.net.SocketTimeoutException e
+            ) {
 
-                reply = "Debug: request timed out.";
+                reply =
+                        "Debug: request timed out.";
 
-            } catch (java.net.UnknownHostException e) {
+            } catch (
+                    java.net.UnknownHostException e
+            ) {
 
-                reply = "Debug: no internet connection.";
+                reply =
+                        "Debug: no internet connection.";
 
             } catch (Exception e) {
 
-                reply = "Debug error: "
-                        + e.getClass().getSimpleName()
-                        + " "
-                        + e.getMessage();
+                reply =
+                        "Debug error: "
+                                + e.getClass()
+                                .getSimpleName()
+                                + " "
+                                + e.getMessage();
             }
 
-            final String finalReply = reply;
+            final String finalReply =
+                    reply;
 
             handler.post(() -> {
 
                 speak(finalReply);
+
                 restartListeningSoon();
 
             });
@@ -663,11 +840,14 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
     @Override
     public void onError(int error) {
+
         restartListeningSoon();
     }
 
     @Override
-    public void onReadyForSpeech(Bundle params) {
+    public void onReadyForSpeech(
+            Bundle params
+    ) {
     }
 
     @Override
@@ -675,11 +855,15 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     }
 
     @Override
-    public void onRmsChanged(float rmsdB) {
+    public void onRmsChanged(
+            float rmsdB
+    ) {
     }
 
     @Override
-    public void onBufferReceived(byte[] buffer) {
+    public void onBufferReceived(
+            byte[] buffer
+    ) {
     }
 
     @Override
@@ -687,11 +871,16 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     }
 
     @Override
-    public void onPartialResults(Bundle partialResults) {
+    public void onPartialResults(
+            Bundle partialResults
+    ) {
     }
 
     @Override
-    public void onEvent(int eventType, Bundle params) {
+    public void onEvent(
+            int eventType,
+            Bundle params
+    ) {
     }
 
     @Override
@@ -710,7 +899,10 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
     @Nullable
     @Override
-    public IBinder onBind(Intent intent) {
+    public IBinder onBind(
+            Intent intent
+    ) {
+
         return null;
     }
 }
