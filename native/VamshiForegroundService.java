@@ -311,38 +311,32 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
         restartListeningSoon();
     }
+
     private void searchYouTube(String query) {
 
-    try {
-        String encodedQuery = Uri.encode(query);
+    if (!VamshiAccessibilityService.isRunning()) {
 
-        // YouTube's app-specific search URI
-        Uri youtubeUri = Uri.parse(
-                "https://www.youtube.com/results?search_query="
-                        + encodedQuery
-        );
+        speak("Please enable Vamshi accessibility service first.");
+        restartListeningSoon();
+        return;
+    }
 
-        Intent youtubeIntent = new Intent(
-                Intent.ACTION_VIEW,
-                youtubeUri
-        );
+    boolean started =
+            VamshiAccessibilityService.searchYouTube(query);
 
-        // Try opening the search result directly in YouTube
-        youtubeIntent.setPackage("com.google.android.youtube");
-        youtubeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-
-        startActivity(youtubeIntent);
+    if (started) {
 
         speak("Searching YouTube for " + query);
 
-    } catch (Exception e) {
+    } else {
 
-        speak("YouTube search error: "
-                + e.getClass().getSimpleName());
+        speak("Sorry, I could not start the YouTube search.");
     }
 
     restartListeningSoon();
-}
+    }
+    
+
 
     private void handleCommand(String command) {
 
