@@ -351,27 +351,10 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             return;
         }
 
+        // Maps navigation command:
+        // "Open Maps and navigate to [destination]"
         if (command.startsWith("open maps")
                 && command.contains("navigate to")) {
-            // YouTube search command:
-// "Open YouTube and search for [something]"
-if (command.startsWith("open youtube")
-        && command.contains("search for")) {
-
-    String query = command.substring(
-            command.indexOf("search for")
-                    + "search for".length()
-    ).trim();
-
-    if (query.isEmpty()) {
-        speak("What would you like to search for on YouTube?");
-        restartListeningSoon();
-        return;
-    }
-
-    searchYouTube(query);
-    return;
-}
 
             String destination =
                     command.substring(
@@ -391,6 +374,33 @@ if (command.startsWith("open youtube")
             }
 
             navigateWithMaps(destination);
+
+            return;
+        }
+
+        // YouTube search command:
+        // "Open YouTube and search for [something]"
+        if (command.startsWith("open youtube")
+                && command.contains("search for")) {
+
+            String query =
+                    command.substring(
+                            command.indexOf("search for")
+                                    + "search for".length()
+                    ).trim();
+
+            if (query.isEmpty()) {
+
+                speak(
+                        "What would you like to search for on YouTube?"
+                );
+
+                restartListeningSoon();
+
+                return;
+            }
+
+            searchYouTube(query);
 
             return;
         }
@@ -481,6 +491,22 @@ if (command.startsWith("open youtube")
             speak(
                     "Hello Rakesh. I am Vamshi."
             );
+
+            restartListeningSoon();
+
+            return;
+        }
+
+        // Temporary accessibility debug command.
+        // Open YouTube manually, then say:
+        // "Hey Vamshi, debug screen"
+        if (command.equals("debug screen")
+                || command.equals("debug youtube")) {
+
+            String result =
+                    VamshiAccessibilityService.debugCurrentScreen();
+
+            speak(result);
 
             restartListeningSoon();
 
