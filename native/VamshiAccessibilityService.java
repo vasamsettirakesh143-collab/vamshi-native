@@ -596,7 +596,60 @@ public class VamshiAccessibilityService extends AccessibilityService {
 
         instance = this;
     }
+public static String debugCurrentScreen() {
 
+    if (instance == null) {
+        return "Accessibility service is not running.";
+    }
+
+    AccessibilityNodeInfo root =
+            instance.getRootInActiveWindow();
+
+    if (root == null) {
+        return "I cannot read the current screen.";
+    }
+
+    StringBuilder result = new StringBuilder();
+
+    collectVisibleElements(root, result);
+
+    if (result.length() == 0) {
+        return "No readable elements found.";
+    }
+
+    return result.toString();
+}
+
+
+private static void collectVisibleElements(
+        AccessibilityNodeInfo node,
+        StringBuilder result
+) {
+
+    if (node == null || result.length() > 1000) {
+        return;
+    }
+
+    CharSequence text = node.getText();
+    CharSequence description = node.getContentDescription();
+
+    if (text != null && text.length() > 0) {
+        result.append(text).append(". ");
+    }
+
+    if (description != null && description.length() > 0) {
+        result.append(description).append(". ");
+    }
+
+    for (int i = 0; i < node.getChildCount(); i++) {
+
+        AccessibilityNodeInfo child = node.getChild(i);
+
+        if (child != null) {
+            collectVisibleElements(child, result);
+        }
+    }
+}
 
     @Override
     public void onAccessibilityEvent(
