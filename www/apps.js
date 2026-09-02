@@ -73,18 +73,46 @@ async function openWebSearch(query) {
     if (!value) return "What should I search for?";
 
     window.open(
-        "https://www.google.com/search?q=" + encodeURIComponent(value ),
+        "https://www.google.com/search?q=" + encodeURIComponent(value),
         "_blank"
     );
 
     return "Searching Google for " + value + ".";
 }
 
+/*
+ * UPDATED:
+ * YouTube search now calls the native accessibility
+ * automation (opens YouTube AND performs the search),
+ * instead of only opening the app.
+ */
 async function openYouTubeSearch(query) {
     const value = String(query || "").trim();
     if (!value) return "What should I search for on YouTube?";
 
-    await openApp("youtube");
+    const launcher = window.Capacitor?.Plugins?.AppLauncherNative;
+
+    // Native automation path (Android app).
+    if (launcher?.searchYouTube) {
+        try {
+            const result = await launcher.searchYouTube({ query: value });
+
+            if (result && result.success) {
+                return "Searching YouTube for " + value + ".";
+            }
+
+            return "Sorry, I could not search YouTube.";
+        } catch (error) {
+            console.error("YouTube search error:", error);
+        }
+    }
+
+    // Browser fallback (if plugin or service unavailable).
+    window.open(
+        "https://www.youtube.com/results?search_query=" + encodeURIComponent(value),
+        "_blank"
+    );
+
     return "Searching YouTube for " + value + ".";
 }
 
@@ -93,7 +121,7 @@ async function openMapSearch(query) {
     if (!value) return "Where should I search on Maps?";
 
     window.open(
-        "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(value ),
+        "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(value),
         "_blank"
     );
 
