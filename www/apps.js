@@ -34,9 +34,36 @@ const APP_ALIASES = {
     "play store": "com.android.vending"
 };
 
+/*
+ * Words to strip from the end of commands like
+ * "open paytm app" so the real name "paytm" is
+ * matched against installed apps.
+ */
+const FILLER_WORDS = ["app", "application", "please", "now"];
+
+function stripFillerWords(name) {
+    let words = name.split(/\s+/);
+
+    while (
+        words.length > 1 &&
+        FILLER_WORDS.includes(words[words.length - 1])
+    ) {
+        words.pop();
+    }
+
+    return words.join(" ").trim();
+}
+
 async function openApp(appName) {
-    const name = String(appName || "").toLowerCase().trim();
+    let name = String(appName || "").toLowerCase().trim();
     const launcher = window.Capacitor?.Plugins?.AppLauncherNative;
+
+    // Strip trailing filler words ("open paytm app" -> "paytm")
+    name = stripFillerWords(name);
+
+    if (!name) {
+        return "Which app should I open?";
+    }
 
     // This searches every installed app with a launcher icon.
     if (launcher?.findAndLaunch) {
@@ -81,7 +108,7 @@ async function openWebSearch(query) {
 }
 
 /*
- * YouTube search now calls the native accessibility
+ * YouTube search calls the native accessibility
  * automation (opens YouTube AND performs the search),
  * instead of only opening the app.
  */
@@ -150,7 +177,7 @@ function findAppName(command) {
         if (
             command.includes("open " + alias) ||
             command.includes("launch " + alias) ||
-            command.includes("start " + alias)
+            command.includes("start + alias)
         ) return alias;
     }
 
@@ -203,11 +230,22 @@ async function tryJarvisCommand(command) {
     }
 
     /*
-     * App opening is intentionally checked LAST,
-     * so search commands are matched first.
+     * Known app opening (from the hardcoded map).
      */
     const appName = findAppName(text);
     if (appName) return openApp(appName);
+
+    /*
+     * FIX:
+     * Unknown app names (e.g. "open paytm app") are no
+     * longer dropped to the AI backend. Extract the name
+     * and let the native findAndLaunch scanner try.
+     */
+    const openMatch = text.match(/^(?:open|launch|start|run)\s+(?:the\s+)?(.+)$/);
+
+    if (openMatch && openMatch[1].trim()) {
+        return openApp(openMatch[1].trim());
+    }
 
     return null;
 }
