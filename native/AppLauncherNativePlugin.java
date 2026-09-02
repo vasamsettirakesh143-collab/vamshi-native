@@ -56,4 +56,25 @@ public class AppLauncherNativePlugin extends Plugin {
         result.put("packageName", match.packageName);
         call.resolve(result);
     }
+
+    /**
+     * Opens YouTube and performs a search using the
+     * accessibility service automation.
+     */
+    @PluginMethod
+    public void searchYouTube(PluginCall call) {
+
+        String query = call.getString("query");
+
+        if (query == null || query.trim().isEmpty()) {
+            call.reject("query is required");
+            return;
+        }
+
+        boolean ok = VamshiAccessibilityService.searchYouTube(query.trim());
+
+        JSObject result = new JSObject();
+        result.put("success", ok);
+        call.resolve(result);
+    }
 }
