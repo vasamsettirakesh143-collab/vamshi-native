@@ -36,7 +36,7 @@ const APP_ALIASES = {
 
 async function openApp(appName) {
     const name = String(appName || "").toLowerCase().trim();
-    const launcher = window.Capacitor?.Plugins?.AppLauncherNative;
+    const launcher = window.Capacitor?.PluginsAppLauncherNative;
 
     // This searches every installed app with a launcher icon.
     if (launcher?.findAndLaunch) {
@@ -81,7 +81,6 @@ async function openWebSearch(query) {
 }
 
 /*
- * UPDATED:
  * YouTube search now calls the native accessibility
  * automation (opens YouTube AND performs the search),
  * instead of only opening the app.
@@ -125,7 +124,7 @@ async function openMapSearch(query) {
         "_blank"
     );
 
-    return "Showing Maps results for " + value + ".";
+    return "Showing Maps results " + value + ".";
 }
 
 function extractAfter(command, phrases) {
@@ -161,6 +160,19 @@ function findAppName(command) {
 async function tryJarvisCommand(command) {
     const text = String(command || "").toLowerCase().trim();
 
+    /*
+     * FIX:
+     * Handles "open youtube and search for cats",
+     * which previously fell through to plain
+     * openApp("youtube") and never searched.
+     */
+    const openAndSearch =
+        text.match(/open youtube (?:and|&) search (?:for )?(.+)/);
+
+    if (openAndSearch && openAndSearch[1].trim()) {
+        return openYouTubeSearch(openAndSearch[1].trim());
+    }
+
     if (text.includes("search youtube for") || text.includes("search youtube ")) {
         return openYouTubeSearch(
             extractAfter(text, ["search youtube for", "search youtube"])
@@ -191,6 +203,10 @@ async function tryJarvisCommand(command) {
         );
     }
 
+    /*
+     * App opening is intentionally checked LAST,
+     * so search commands are matched first.
+     */
     const appName = findAppName(text);
     if (appName) return openApp(appName);
 
