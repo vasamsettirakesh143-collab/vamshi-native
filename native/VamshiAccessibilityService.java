@@ -309,7 +309,9 @@ public class VamshiAccessibilityService extends AccessibilityService {
         }
 
         AccessibilityNodeInfo root =
-                getRootInActiveWindow        if (root == null) {
+                getRootInActiveWindow();
+
+        if (root == null) {
 
             retryYouTubeSearch();
             return;
@@ -332,7 +334,7 @@ public class VamshiAccessibilityService extends AccessibilityService {
          * Android API 30+ exposes the keyboard's
          * IME Enter action directly.
          */
-        if ( != null
+        if (editable != null
                 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
 
             boolean submitted =
