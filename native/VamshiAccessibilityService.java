@@ -19,6 +19,23 @@ public class VamshiAccessibilityService extends AccessibilityService {
     private static String pendingYouTubeSearch = null;
     private static boolean youtubeSearchRunning = false;
 
+    /*
+     * FIX #1:
+     * Prevents the accessibility event flood from
+     * cancelling and re-scheduling automation steps
+     * forever (which starved the automation and left
+     * YouTube stuck on the home feed).
+     */
+    private boolean callbackScheduled = false;
+
+    /*
+     * FIX #2:
+     * Hard timeout so a failed search cannot retry
+     * forever in the background.
+     */
+    private long searchStartTime = 0;
+    private static final long SEARCH_TIMEOUT_MS = 15000;
+
     private static final String YOUTUBE_PACKAGE =
             "com.google.android.youtube";
 
@@ -42,6 +59,31 @@ public class VamshiAccessibilityService extends AccessibilityService {
 
 
     /*
+     * Schedules one automation step.
+     *
+     * If a step is already scheduled, we DO NOT
+     * cancel it. Incoming accessibility events are
+     * ignored until the scheduled step actually runs.
+     */
+    private void scheduleStep(long delayMillis, Runnable step) {
+
+        if (callbackScheduled) {
+            return;
+        }
+
+        callbackScheduled = true;
+
+        handler.postDelayed(() -> {
+
+            callbackScheduled = false;
+
+            step.run();
+
+        }, delayMillis);
+    }
+
+
+    /*
      * Starts YouTube and remembers what Vamshi
      * should search for after YouTube opens.
      */
@@ -56,6 +98,11 @@ public class VamshiAccessibilityService extends AccessibilityService {
 
         pendingYouTubeSearch = query.trim();
         youtubeSearchRunning = true;
+
+        instance.searchStartTime =
+                System.currentTimeMillis();
+
+        instance.callbackScheduled = false;
 
         boolean opened = AppLauncherUtil.launch(
                 instance,
@@ -73,9 +120,9 @@ public class VamshiAccessibilityService extends AccessibilityService {
         /*
          * Give YouTube some time to load.
          */
-        instance.handler.postDelayed(
-                instance::continueYouTubeSearch,
-                1800
+        instance.scheduleStep(
+                1800,
+                instance::continueYouTubeSearch
         );
 
         return true;
@@ -90,6 +137,12 @@ public class VamshiAccessibilityService extends AccessibilityService {
         if (!youtubeSearchRunning
                 || pendingYouTubeSearch == null) {
 
+            return;
+        }
+
+        if (searchTimedOut()) {
+
+            finishYouTubeSearch();
             return;
         }
 
@@ -139,9 +192,9 @@ public class VamshiAccessibilityService extends AccessibilityService {
 
             if (clicked) {
 
-                handler.postDelayed(
-                        this::fillYouTubeSearchBox,
-                        700
+                scheduleStep(
+                        700,
+                        this::fillYouTubeSearchBox
                 );
 
                 return;
@@ -161,6 +214,12 @@ public class VamshiAccessibilityService extends AccessibilityService {
         if (!youtubeSearchRunning
                 || pendingYouTubeSearch == null) {
 
+            return;
+        }
+
+        if (searchTimedOut()) {
+
+            finishYouTubeSearch();
             return;
         }
 
@@ -231,9 +290,9 @@ public class VamshiAccessibilityService extends AccessibilityService {
             return;
         }
 
-        handler.postDelayed(
-                this::submitYouTubeSearch,
-                500
+        scheduleStep(
+                500,
+                this::submitYouTubeSearch
         );
     }
 
@@ -243,10 +302,14 @@ public class VamshiAccessibilityService extends AccessibilityService {
      */
     private void submitYouTubeSearch() {
 
-        AccessibilityNodeInfo root =
-                getRootInActiveWindow();
+        if (!youtubeSearchRunning
+                || pendingYouTubeSearch == null) {
 
-        if (root == null) {
+            return;
+        }
+
+        AccessibilityNodeInfo root =
+                getRootInActiveWindow        if (root == null) {
 
             retryYouTubeSearch();
             return;
@@ -256,10 +319,20 @@ public class VamshiAccessibilityService extends AccessibilityService {
                 findEditableNode(root);
 
         /*
+         * FIX #3:
+         * Only try to click a "Search" button if we
+         * are actually on the search screen (an editable
+         * field exists). This prevents the automation
+         * from re-clicking the home screen Search icon.
+         */
+        boolean onSearchScreen =
+                editable != null;
+
+        /*
          * Android API 30+ exposes the keyboard's
          * IME Enter action directly.
          */
-        if (editable != null
+        if ( != null
                 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
 
             boolean submitted =
@@ -282,35 +355,38 @@ public class VamshiAccessibilityService extends AccessibilityService {
          * Fallback:
          * look for a visible Search button/action.
          */
-        AccessibilityNodeInfo search =
-                findNode(
-                        root,
-                        "search"
-                );
+        if (onSearchScreen) {
 
-        if (search != null
-                && clickNodeOrParent(search)) {
+            AccessibilityNodeInfo search =
+                    findNode(
+                            root,
+                            "search"
+                    );
 
-            finishYouTubeSearch();
-            return;
-        }
+            if (search != null
+                    && clickNodeOrParent(search)) {
+
+                finishYouTubeSearch();
+                return;
+            }
 
 
-        /*
-         * Another possible label used by some
-         * keyboard / YouTube versions.
-         */
-        AccessibilityNodeInfo go =
-                findNode(
-                        root,
-                        "go"
-                );
+            /*
+             * Another possible label used by some
+             * keyboard / YouTube versions.
+             */
+            AccessibilityNodeInfo go =
+                    findNode(
+                            root,
+                            "go"
+                    );
 
-        if (go != null
-                && clickNodeOrParent(go)) {
+            if (go != null
+                    && clickNodeOrParent(go)) {
 
-            finishYouTubeSearch();
-            return;
+                finishYouTubeSearch();
+                return;
+            }
         }
 
 
@@ -327,10 +403,28 @@ public class VamshiAccessibilityService extends AccessibilityService {
             return;
         }
 
-        handler.postDelayed(
-                this::continueYouTubeSearch,
-                700
+        if (searchTimedOut()) {
+
+            finishYouTubeSearch();
+            return;
+        }
+
+        scheduleStep(
+                700,
+                this::continueYouTubeSearch
         );
+    }
+
+
+    /*
+     * FIX #2 helper:
+     * True if the search has been running too long.
+     */
+    private boolean searchTimedOut() {
+
+        return System.currentTimeMillis()
+                - searchStartTime
+                > SEARCH_TIMEOUT_MS;
     }
 
 
@@ -338,6 +432,7 @@ public class VamshiAccessibilityService extends AccessibilityService {
 
         youtubeSearchRunning = false;
         pendingYouTubeSearch = null;
+        callbackScheduled = false;
     }
 
 
@@ -596,60 +691,63 @@ public class VamshiAccessibilityService extends AccessibilityService {
 
         instance = this;
     }
-public static String debugCurrentScreen() {
 
-    if (instance == null) {
-        return "Accessibility service is not running.";
+
+    public static String debugCurrentScreen() {
+
+        if (instance == null) {
+            return "Accessibility service is not running.";
+        }
+
+        AccessibilityNodeInfo root =
+                instance.getRootInActiveWindow();
+
+        if (root == null) {
+            return "I cannot read the current screen.";
+        }
+
+        StringBuilder result = new StringBuilder();
+
+        collectVisibleElements(root, result);
+
+        if (result.length() == 0) {
+            return "No readable elements found.";
+        }
+
+        return result.toString();
     }
 
-    AccessibilityNodeInfo root =
-            instance.getRootInActiveWindow();
 
-    if (root == null) {
-        return "I cannot read the current screen.";
-    }
+    private static void collectVisibleElements(
+            AccessibilityNodeInfo node,
+            StringBuilder result
+    ) {
 
-    StringBuilder result = new StringBuilder();
+        if (node == null || result.length() > 1000) {
+            return;
+        }
 
-    collectVisibleElements(root, result);
+        CharSequence text = node.getText();
+        CharSequence description = node.getContentDescription();
 
-    if (result.length() == 0) {
-        return "No readable elements found.";
-    }
+        if (text != null && text.length() > 0) {
+            result.append(text).append(". ");
+        }
 
-    return result.toString();
-}
+        if (description != null && description.length() > 0) {
+            result.append(description).append(". ");
+        }
 
+        for (int i = 0; i < node.getChildCount(); i++) {
 
-private static void collectVisibleElements(
-        AccessibilityNodeInfo node,
-        StringBuilder result
-) {
+            AccessibilityNodeInfo child = node.getChild(i);
 
-    if (node == null || result.length() > 1000) {
-        return;
-    }
-
-    CharSequence text = node.getText();
-    CharSequence description = node.getContentDescription();
-
-    if (text != null && text.length() > 0) {
-        result.append(text).append(". ");
-    }
-
-    if (description != null && description.length() > 0) {
-        result.append(description).append(". ");
-    }
-
-    for (int i = 0; i < node.getChildCount(); i++) {
-
-        AccessibilityNodeInfo child = node.getChild(i);
-
-        if (child != null) {
-            collectVisibleElements(child, result);
+            if (child != null) {
+                collectVisibleElements(child, result);
+            }
         }
     }
-}
+
 
     @Override
     public void onAccessibilityEvent(
@@ -666,17 +764,17 @@ private static void collectVisibleElements(
                 event.getPackageName().toString();
 
         /*
-         * If YouTube has just opened and Vamshi
-         * has a pending search request, continue it.
+         * FIX #1:
+         * The event handler is now ONLY a backup
+         * trigger. It never cancels an already
+         * scheduled automation step.
          */
         if (youtubeSearchRunning
                 && YOUTUBE_PACKAGE.equals(packageName)) {
 
-            handler.removeCallbacksAndMessages(null);
-
-            handler.postDelayed(
-                    this::continueYouTubeSearch,
-                    350
+            scheduleStep(
+                    350,
+                    this::continueYouTubeSearch
             );
         }
     }
@@ -696,6 +794,7 @@ private static void collectVisibleElements(
 
         youtubeSearchRunning = false;
         pendingYouTubeSearch = null;
+        callbackScheduled = false;
 
         if (instance == this) {
             instance = null;
