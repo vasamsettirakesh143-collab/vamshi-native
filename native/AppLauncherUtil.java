@@ -52,6 +52,21 @@ public class AppLauncherUtil {
         return result;
     }
 
+    /*
+     * UPGRADED MATCHER:
+     *
+     * Previously used length-difference scoring, which
+     * could pick the wrong app for multi-word names like
+     * "free fire max" or suffixed labels like
+     * "PhonePe: Secure Payments".
+     *
+     * Now uses priority-based scoring:
+     *   100 - exact match
+     *    80 - label starts with the spoken name
+     *    60 - label contains the spoken name
+     *    40 - spoken name contains the label
+     * (with closeness tie-breaking inside each tier)
+     */
     public static AppEntry findBestMatch(Context context, String spokenName) {
         String query = spokenName.toLowerCase(Locale.US).trim();
         if (query.isEmpty()) {
@@ -60,22 +75,27 @@ public class AppLauncherUtil {
 
         List<AppEntry> apps = getLaunchableApps(context);
         AppEntry bestMatch = null;
-        int bestScore = Integer.MAX_VALUE;
+        int bestScore = Integer.MIN_VALUE;
 
         for (AppEntry app : apps) {
-            String label = app.label.toLowerCase(Locale.US);
+            String label = app.label.toLowerCase(Locale.US).trim();
 
+            int score;
             if (label.equals(query)) {
-                return app;
+                score = 100;                                    // exact match
+            } else if (label.startsWith(query)) {
+                score = 80 - (label.length() - query.length()); // starts with
+            } else if (label.contains(query)) {
+                score = 60 - (label.length() - query.length()); // contains
+            } else if (query.contains(label) && label.length() > 2) {
+                score = 40;                                     // spoken contains label
+            } else {
+                continue;
             }
 
-            if (label.contains(query) || query.contains(label)) {
-                int score = Math.abs(label.length() - query.length());
-
-                if (score < bestScore) {
-                    bestScore = score;
-                    bestMatch = app;
-                }
+            if (score > bestScore) {
+                bestScore = score;
+                bestMatch = app;
             }
         }
 
