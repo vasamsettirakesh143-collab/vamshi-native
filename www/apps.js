@@ -36,7 +36,7 @@ const APP_ALIASES = {
 
 async function openApp(appName) {
     const name = String(appName || "").toLowerCase().trim();
-    const launcher = window.Capacitor?.PluginsAppLauncherNative;
+    const launcher = window.Capacitor?.Plugins?.AppLauncherNative;
 
     // This searches every installed app with a launcher icon.
     if (launcher?.findAndLaunch) {
@@ -124,7 +124,7 @@ async function openMapSearch(query) {
         "_blank"
     );
 
-    return "Showing Maps results " + value + ".";
+    return "Showing Maps results for " + value + ".";
 }
 
 function extractAfter(command, phrases) {
@@ -161,7 +161,6 @@ async function tryJarvisCommand(command) {
     const text = String(command || "").toLowerCase().trim();
 
     /*
-     * FIX:
      * Handles "open youtube and search for cats",
      * which previously fell through to plain
      * openApp("youtube") and never searched.
