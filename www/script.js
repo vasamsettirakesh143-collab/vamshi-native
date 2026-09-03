@@ -69,7 +69,27 @@ async function sendToVamshi(text) {
     const thinking = addBubble("assistant", "Vamshi is typing...", true);
 
     try {
-        const reply = await VamshiBrain(text.toLowerCase());
+        /*
+         * FIX:
+         * Try local device commands first (open app,
+         * searches, etc.) before sending to Gemini.
+         * This makes the chat path behave exactly like
+         * the native wake-word path.
+         */
+        let reply = null;
+
+        if (window.tryJarvisCommand) {
+            try {
+                reply = await window.tryJarvisCommand(text.toLowerCase());
+            } catch (commandError) {
+                console.error("Local command error:", commandError);
+            }
+        }
+
+        if (!reply) {
+            reply = await VamshiBrain(text.toLowerCase());
+        }
+
         thinking.remove();
         addBubble("assistant", String(reply));
         speak(String(reply));
