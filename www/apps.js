@@ -58,6 +58,9 @@ async function openApp(appName) {
     let name = String(appName || "").toLowerCase().trim();
     const launcher = window.Capacitor?.Plugins?.AppLauncherNative;
 
+    // "what's app" -> "whats app" so it can match "WhatsApp"
+    name = name.replace(/['\u2019]/g, "");
+
     // Strip trailing filler words ("open paytm app" -> "paytm")
     name = stripFillerWords(name);
 
@@ -177,7 +180,7 @@ function findAppName(command) {
         if (
             command.includes("open " + alias) ||
             command.includes("launch " + alias) ||
-            command.includes("start + alias)
+            command.includes("start " + alias)
         ) return alias;
     }
 
@@ -188,9 +191,7 @@ async function tryJarvisCommand(command) {
     const text = String(command || "").toLowerCase().trim();
 
     /*
-     * Handles "open youtube and search for cats",
-     * which previously fell through to plain
-     * openApp("youtube") and never searched.
+     * Handles "open youtube and search for cats".
      */
     const openAndSearch =
         text.match(/open youtube (?:and|&) search (?:for )?(.+)/);
@@ -236,10 +237,8 @@ async function tryJarvisCommand(command) {
     if (appName) return openApp(appName);
 
     /*
-     * FIX:
-     * Unknown app names (e.g. "open paytm app") are no
-     * longer dropped to the AI backend. Extract the name
-     * and let the native findAndLaunch scanner try.
+     * Unknown app names (e.g. "open paytm app") go to the
+ * native findAndLaunch scanner instead of the AI backend.
      */
     const openMatch = text.match(/^(?:open|launch|start|run)\s+(?:the\s+)?(.+)$/);
 
