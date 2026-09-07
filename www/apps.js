@@ -98,6 +98,50 @@ async function openApp(appName) {
     }
 }
 
+/*
+ * Sends a WhatsApp message to a contact via the native
+ * plugin. WhatsApp opens in the contact's chat with the
+ * message pre-filled; the user taps send (WhatsApp
+ * requires this by design).
+ */
+async function sendWhatsAppMessage(contactName, message) {
+    const contact = String(contactName || "").trim();
+    const text = String(message || "").trim();
+
+    if (!contact) return "Who should I send the WhatsApp message to?";
+    if (!text) return "What message should I send to " + contact + "?";
+
+    const launcher = window.Capacitor?.Plugins?.AppLauncherNative;
+
+    if (!launcher?.sendWhatsApp) {
+        return "Sending WhatsApp messages works only inside the installed Vamshi app.";
+    }
+
+    try {
+        const result = await launcher.sendWhatsApp({
+            contactName: contact,
+            message: text
+        });
+
+        return "WhatsApp chat with " + (result.contact || contact) +
+            " is open. The message is typed — tap send when ready.";
+    } catch (error) {
+        console.error("WhatsApp send error:", error);
+
+        const reason = String(error?.message || error || "");
+
+        if (reason.includes("No contact matched")) {
+            return "I could not find " + contact + " in your contacts.";
+        }
+
+        if (reason.includes("App not installed") || reason.includes("Could not open WhatsApp")) {
+            return "WhatsApp does not seem to be installed on this phone.";
+        }
+
+        return "Sorry, I could not open the WhatsApp chat with " + contact + ".";
+    }
+}
+
 async function openWebSearch(query) {
     const value = String(query || "").trim();
     if (!value) return "What should I search for?";
@@ -187,8 +231,60 @@ function findAppName(command) {
     return null;
 }
 
-async function tryJarvisCommand(command) {
+/*
+ * Parses WhatsApp messaging commands. Examples it handles:
+ *   "send whatsapp message to mom saying I will be late"
+ *   "send whatsapp to mom I will be late"
+ *   "whatsapp mom saying I will be late"
+ *   "tell mom on whatsapp that I will be late"
+ */
+function parseWhatsAppCommand(text) {
+    // send whatsapp [message] to <contact> saying/telling/that <message>
+    let match = text.match(
+        /^send\s+whatsapp(?:\s+message)?(?:\s+to)?\s+(.+?)\s+(?:saying|telling|that|telling that)\s+(.+)$/
+    );
+    if (match) return { contact: match[1], message: match[2] };
+
+    // send whatsapp to <contact> <message>  (no "saying")
+    match = text.match(/^send\s+whatsapp(?:\s+message)?\s+to\s+(.+)$/);
+    if (match) {
+        const parts = match[1].split(/\s+(?:saying|that)\s+/);
+        if (parts.length === 2) return { contact: parts[0], message: parts[1] };
+        return null; // no message text -> need to ask
+    }
+
+    // tell <contact> on whatsapp that <message>
+    match = text.match(/^tell\s+(.+?)\s+on\s+whatsapp\s+(?:that\s+)?(.+)$/);
+    if (match) return { contact: match[1], message: match[2] };
+
+    // whatsapp <contact> saying <message>
+    match = text.match(/^whatsapp\s+(.+?)\s+(?:saying|that)\s+(.+)$/);
+    if (match) return { contact: match[1], message: match[2] };
+
+    return null;
+}
+
+async tryJarvisCommand(command) {
     const text = String(command || "").toLowerCase().trim();
+
+    /*
+     * WhatsApp messaging — checked before app opening,
+     * so "send whatsapp to mom..." is not eaten by the
+     * plain "open whatsapp" handler.
+     */
+    const whatsappMatch = parseWhatsAppCommand(text);
+    if (whatsappMatch) {
+        return sendWhatsAppMessage(
+            whatsappMatch.contact,
+            whatsappMatch.message
+        );
+    }
+
+    // "open whatsapp chat with mom" — just open the chat
+ const chatMatch = text.match(/open whatsapp chat with (.+)/);
+    if (chatMatch && chatMatch[1].trim()) {
+        return sendWhatsAppMessage(chatMatch[1].trim(), "");
+    }
 
     /*
      * Handles "open youtube and search for cats".
@@ -238,7 +334,7 @@ async function tryJarvisCommand(command) {
 
     /*
      * Unknown app names (e.g. "open paytm app") go to the
- * native findAndLaunch scanner instead of the AI backend.
+     * native findAndLaunch scanner instead of the AI backend.
      */
     const openMatch = text.match(/^(?:open|launch|start|run)\s+(?:the\s+)?(.+)$/);
 
@@ -251,6 +347,7 @@ async function tryJarvisCommand(command) {
 
 window.APPS = APPS;
 window.openApp = openApp;
+window.sendWhatsAppMessage = sendWhatsAppMessage;
 window.openWebSearch = openWebSearch;
 window.openYouTubeSearch = openYouTubeSearch;
 window.openMapSearch = openMapSearch;
