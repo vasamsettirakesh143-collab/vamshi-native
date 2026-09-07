@@ -18,42 +18,51 @@ public class VamshiApp extends Application {
             @Override
             public void uncaughtException(Thread thread, Throwable error) {
 
-                try {
+                StringBuilder sb = new StringBuilder();
 
-                    String reason = "VAMSHI CRASH: "
-                            + error.getClass().getSimpleName()
-                            + " - " + error.getMessage();
+                sb.append("CRASH: ")
+                  .append(error.getClass().getSimpleName())
+                  .append("\n")
+                  .append(error.getMessage())
+                  .append("\n");
 
-                    if (error.getCause() != null) {
-                        reason = reason + " CAUSED BY: "
-                                + error.getCause().getClass().getSimpleName()
-                                + " - " + error.getCause().getMessage();
+                StackTraceElement[] stack = error.getStackTrace();
+
+                for (StackTraceElement element : stack) {
+
+                    String line = element.toString();
+
+                    if (line.contains("vamshi")
+                            || line.contains("Vamshi")
+                            || line.contains("MainActivity")) {
+
+                        sb.append(line).append("\n");
                     }
-
-                    final String finalReason = reason;
-
-                    Handler mainHandler = new Handler(Looper.getMainLooper());
-
-                    mainHandler.post(new Runnable() {
-
-                        @Override
-                        public void run() {
-                            Toast.makeText(
-                                    getApplicationContext(),
-                                    finalReason,
-                                    Toast.LENGTH_LONG
-                            ).show();
-                        }
-                    });
-
-                    Thread.sleep(2500);
-
-                } catch (Exception ignored) {
                 }
 
-                if (defaultHandler != null) {
-                    defaultHandler.uncaughtException(thread, error);
+                if (error.getCause() != null) {
+
+                    sb.append("CAUSED BY: ")
+                      .append(error.getCause().toString());
                 }
+
+                final String reason = sb.toString();
+
+                new Handler(Looper.getMainLooper())
+                        .post(new Runnable() {
+
+                    @Override
+                    public void run() {
+
+                        Toast.makeText(
+                                getApplicationContext(),
+                                reason,
+                                Toast.LENGTH_LONG
+                        ).show();
+
+                        Looper.loop();
+                    }
+                });
             }
         });
     }
