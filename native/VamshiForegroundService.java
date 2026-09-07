@@ -17,6 +17,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
@@ -54,6 +55,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     private TextToSpeech textToSpeech;
     private AudioManager audioManager;
     private Handler handler;
+    private PowerManager.WakeLock wakeLock;
 
     private boolean listeningEnabled = false;
     private boolean awaitingFollowUp = false;
@@ -66,6 +68,18 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         createNotificationChannel();
         handler = new Handler(Looper.getMainLooper());
         audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+
+        // Partial wake lock: keeps the CPU running so the
+        // listener is not frozen when the screen is off.
+        PowerManager powerManager =
+                (PowerManager) getSystemService(Context.POWER_SERVICE);
+
+        if (powerManager != null) {
+            wakeLock = powerManager.newWakeLock(
+                    PowerManager.PARTIAL_WAKE_LOCK,
+                    "VamshiAI:ForegroundWakeLock");
+            wakeLock.acquire();
+        }
     }
 
     @Override
@@ -1009,9 +1023,21 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     }
 
     @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        // Restart ourselves if the user swipes the app away.
+        Intent restartIntent =
+                new Intent(this, VamshiForegroundService.class);
+        ContextCompat.startForegroundService(this, restartIntent);
+        super.onTaskRemoved(rootIntent);
+    }
+
+    @Override
     public void onDestroy() {
 
-        super.onDestroy();
+        if (wakeLock != null && wakeLock.isHeld()) {
+            wakeLock.release();
+            wakeLock = null;
+        }
 
         if (speechRecognizer != null) {
             speechRecognizer.destroy();
@@ -1020,6 +1046,17 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         if (textToSpeech != null) {
             textToSpeech.shutdown();
         }
+
+        // Self-restart if the system kills us.
+        try {
+            Intent restartIntent =
+                    new Intent(this, VamshiForegroundService.class);
+            ContextCompat.startForegroundService(this, restartIntent);
+        } catch (Exception ignored) {
+            // App is being uninstalled or stopped — don't crash.
+        }
+
+        super.onDestroy();
     }
 
     @Nullable
