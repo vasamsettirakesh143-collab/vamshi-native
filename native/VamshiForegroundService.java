@@ -57,15 +57,10 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     private boolean listeningEnabled = false;
     private boolean awaitingFollowUp = false;
     private boolean awaitingCallName = false;
-
-    /*
-     * Set when Vamshi asks "who should I send the
-     * WhatsApp message to?" so the next spoken
-     * sentence is treated as the contact name.
-     */
     private boolean awaitingWhatsAppName = false;
 
-    @Override    public void onCreate() {
+    @Override
+    public void onCreate() {
         super.onCreate();
         createNotificationChannel();
 
@@ -164,7 +159,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                         android.R.drawable.ic_btn_speak_now
                 )
                 .setContentIntent(pendingIntent)
-                .setOngoing)
+                .setOngoing(true)
                 .build();
     }
 
@@ -284,10 +279,6 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                 matches.get(0)
                         .toLowerCase(Locale.US);
 
-        /*
-         * Follow-up for "send whatsapp to..." with
-         * no contact name given.
-         */
         if (awaitingWhatsAppName) {
 
             awaitingWhatsAppName = false;
@@ -347,11 +338,11 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         }
 
         boolean started =
-                VamshiAccessibility.searchYouTube(query);
+                VamshiAccessibilityService.searchYouTube(query);
 
         if (started) {
 
-            speak("Searching for " + query);
+            speak("Searching YouTube for " + query);
 
         } else {
 
@@ -375,10 +366,10 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         }
 
         /*
-         * messaging commands. Checked BEFORE
+         * WhatsApp messaging commands. Checked BEFORE
          * the "open " and "call " handlers so phrases
-         * like "open whatsapp chat with amma" and
-         * "send whatsapp to amma" are not eaten by them.
+         * like "open whatsapp chat with amma" are not
+         * eaten by them.
          */
         if (command.contains("whatsapp")) {
 
@@ -387,7 +378,8 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             return;
         }
 
-        // Maps navigation command        // "Open Maps and navigate to [destination]"
+        // Maps navigation command:
+        // "Open Maps and navigate to [destination]"
         if (command.startsWith("open maps")
                 && command.contains("navigate to")) {
 
@@ -408,7 +400,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                 return;
             }
 
-            navigateWith(destination);
+            navigateWithMaps(destination);
 
             return;
         }
@@ -452,7 +444,8 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             return;
         }
 
-        if (command.equals("call                || command.startsWith("call")) {
+        if (command.equals("call")
+                || command.startsWith("call")) {
 
             handleCallCommand("");
 
@@ -515,7 +508,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             return;
         }
 
-        if (command("hi")
+        if (command.equals("hi")
                 || command.equals("hello")
                 || command.equals("hey")
                 || command.startsWith("hi ")
@@ -560,7 +553,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
      *   "open whatsapp chat with amma"
      *   "open whatsapp" -> opens the WhatsApp app itself
      *
-     * handles bare "send whatsapp" by asking
+     * Also handles bare "send whatsapp" by asking
      * for the contact name as a follow-up.
      */
     private void handleWhatsAppCommand(String command) {
@@ -570,16 +563,13 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                         ? ""
                         : command.trim();
 
-        // Bare "whatsapp" / "send whatsapp" handling.
-        // "open whatsapp" alone still opens the app,
-        // like any other app name.
         boolean hasTarget =
                 text.matches(".*\\b(?:to|with)\\s+.+")
                         || text.matches("^whatsapp\\s+.+");
 
         if (!hasTarget) {
 
-            if (text("open whatsapp")
+            if (text.startsWith("open whatsapp")
                     || text.equals("whatsapp")) {
 
                 openAnyApp("whatsapp");
@@ -602,23 +592,19 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         String message = null;
         boolean openChatOnly = false;
 
-        /*
-         * Pattern 1:
-         * "send whatsapp [message] to <contact> saying/telling/that <message>"
-         */
+        // Pattern 1:
+        // "send whatsapp [message] to <contact> saying/telling/that <message>"
         Matcher m = Pattern.compile(
                 "send\\s+whatsapp(?:\\s+message)?\\s+to\\s+(.+?)\\s+(?:saying|telling|that)\\s+(.+)"
         ).matcher(text);
 
         if (m.find()) {
-            contactName = m.group(1trim();
+            contactName = m.group(1).trim();
             message = m.group(2).trim();
         }
 
-        /*
-         * Pattern 2:
-         * "send whatsapp to <contact> <message>"
-         */
+        // Pattern 2:
+        // "send whatsapp to <contact> <message>"
         if (contactName == null) {
 
             m = Pattern.compile(
@@ -639,33 +625,23 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
                 } else {
 
-                    /*
-                     * No "saying". The contact is
-                     * normally the first word ("amma hi"),
-                     * but spoken names can be two words
-                     * ("rakesh brother"). Use the first
-                     * word as the contact and the rest as
-                     * the message; if there is no rest,
-                     * the whole thing is the contact name.
-                     */
                     String[] words = rest.split("\\s+", 2);
 
                     contactName = words[0].trim();
 
                     if (words.length > 1) {
                         message = words[1].trim();
-                                   }
+                    }
+                }
             }
         }
 
-        /*
-         * Pattern 3:
-         * "tell <contact> on whatsapp [that] <message>"
-         */
+        // Pattern 3:
+        // "tell <contact> on whatsapp [that] <message>"
         if (contactName == null) {
 
             m = Pattern.compile(
-                    "tell\\s+(.+?)\\s+on\\s+whatsapp\\s?:that\\s+)?(.+)"
+                    "tell\\s+(.+?)\\s+on\\s+whatsapp\\s+(?:that\\s+)?(.+)"
             ).matcher(text);
 
             if (m.find()) {
@@ -674,10 +650,8 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             }
         }
 
-        /*
-         * Pattern 4:
-         * "whatsapp <contact> saying [message]"
-         */
+        // Pattern 4:
+        // "whatsapp <contact> saying [message]"
         if (contactName == null) {
 
             m = Pattern.compile(
@@ -690,10 +664,8 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             }
         }
 
-        /*
-         * Pattern 5:
-         * "open whatsapp chat with <contact>" -> chat only.
-         */
+        // Pattern 5:
+        // "open whatsapp chat with <contact>" -> chat only.
         if (contactName == null) {
 
             m = Pattern.compile(
@@ -708,10 +680,8 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             }
         }
 
-        /*
-         * Pattern 6:
-         * "whatsapp <contact>" alone -> chat only.
-         */
+        // Pattern 6:
+        // "whatsapp <contact>" alone -> chat only.
         if (contactName == null) {
 
             m = Pattern.compile(
@@ -741,7 +711,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
         // Strip filler words from the contact name.
         contactName = contactName
-                .replaceAll("\\s+(?:app|please|now)$", "")
+                .replaceAll("\\s+(?:app|pleasenow)$", "")
                 .trim();
 
         if (openChat || message == null || message.isEmpty()) {
@@ -756,8 +726,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
     /*
      * Resolves the spoken name to a contact and opens
-     * WhatsApp in that chat with the message pre-filled,
-     * using the same wa.me approach as the chat path.
+     * WhatsApp in that chat with the message pre-filled.
      */
     private void sendWhatsAppToContact(
             String spokenName,
@@ -817,14 +786,12 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             }
 
             if (digits.length() == 10) {
-                digits = "91" + digits;
+                digits = "91 + digits;
             }
 
             String encodedText = Uri.encode(message);
 
-            /*
-             * Attempt 1: wa.me pinned to WhatsApp.
-             */
+            // Attempt 1: wa.me pinned to WhatsApp.
             try {
 
                 Intent intent = new Intent(Intent.ACTION_VIEW);
@@ -842,12 +809,10 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                 speakWhatsAppConfirmation(contact.name);
                 return;
 
-            } catch (Exception ignored) {
+            } (Exception ignored) {
             }
 
-            /*
-             * Attempt 2: wa.me unpinned.
-             */
+            // Attempt 2: wa.me unpinned.
             try {
 
                 Intent intent = new Intent(Intent.ACTION_VIEW);
@@ -867,9 +832,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             } catch (Exception ignored) {
             }
 
-            /*
-             * Attempt 3: whatsapp:// deep link.
-             */
+            // Attempt 3: whatsapp:// deep link.
             try {
 
                 Intent intent = new Intent(Intent.ACTION_VIEW);
@@ -888,7 +851,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             } catch (Exception e) {
 
                 speak(
-                        "Sorry, I could not open WhatsApp."
+ "Sorry, I could not open WhatsApp."
                 );
             }
 
@@ -903,16 +866,10 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         restartListeningSoon();
     }
 
-    /*
-     * Opens a WhatsApp chat without a message.
-     */
     private void openWhatsAppChat(String spokenName) {
         sendWhatsAppToContact(spokenName, "");
     }
 
-    /*
-     * Confirmation message.
-     */
     private void speakWhatsAppConfirmation(String contactName) {
 
         speak(
@@ -940,7 +897,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             Intent mapsIntent =
                     new Intent(
                             Intent.ACTION_VIEW,
-                            mapsUri
+                            maps
                     );
 
             mapsIntent.setPackage(
@@ -1028,7 +985,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                 ) == PackageManager.PERMISSION_GRANTED;
 
         if (!hasContactsPermission
-                || !hasCallPermission) {
+                || !hasPermission) {
 
             speak(
                     "I don't have permission to make calls yet. Please open the app and grant the contacts and phone permissions."
@@ -1408,7 +1365,6 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
     /*
      * Executes an action decided by the AI brain.
-     * This is Jarvis mode: any phrasing works.
      */
     private void runAiAction(String actionJson) {
 
@@ -1540,7 +1496,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         }
 
         if (textToSpeech != null) {
-            textToSpeech.shutdown();
+            textToSpeech();
         }
     }
 
