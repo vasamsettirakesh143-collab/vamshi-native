@@ -29,6 +29,31 @@ jobs:
       - name: Add Android platform
         run: npx cap add android
 
+      - name: Force native package name to com.vamshi.ai
+        run: |
+          python3 - <<'EOF'
+          import re
+
+          path = "android/app/build.gradle"
+
+          with open(path) as f:
+              content = f.read()
+
+          content = re.sub(
+              r'namespace\s+"[^"]*"',
+              'namespace "com.vamshi.ai"',
+              content
+          )
+          content = re.sub(
+              r'applicationId\s+"[^"]*"',
+              'applicationId "com.vamshi.ai"',
+              content
+          )
+
+          with open(path, "w") as f:
+              f.write(content)
+          EOF
+
       - name: Add recyclerview dependency
         run: |
           python3 - <<'EOF'
@@ -78,14 +103,14 @@ jobs:
 
           theme = 'android:theme="@style/Theme.AppCompat.NoActionBar"'
 
-          if 'android:theme=' in content:
-              content = re.sub(
-                  r'android:theme="[^"]*"',
-                  theme,
-                  content,
-                  count=1
-              )
-          else:
+          # Replace EVERY theme in the manifest, not just the first one.
+          content = re.sub(
+              r'android:theme="[^"]*"',
+              theme,
+              content
+          )
+
+          if 'android:theme=' not in content:
               content = content.replace(
                   '<application',
                   '<application\n        ' + theme,
@@ -134,6 +159,9 @@ jobs:
           with open(path, "w") as f:
               f.write(content)
           EOF
+
+      - name: Print final manifest for verification
+        run: cat android/app/src/main/AndroidManifest.xml
 
       - name: Sync web assets into the native project
         run: npx cap sync android
