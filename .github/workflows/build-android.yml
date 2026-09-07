@@ -29,6 +29,27 @@ jobs:
       - name: Add Android platform
         run: npx cap add android
 
+      - name: Add recyclerview dependency
+        run: |
+          python3 - <<'EOF'
+          path = "android/app/build.gradle"
+
+          with open(path) as f:
+              content = f.read()
+
+          recycler = "    implementation 'androidx.recyclerview:recyclerview:1.3.2'\n"
+
+          if "androidx.recyclerview" not in content:
+              content = content.replace(
+                  "dependencies {",
+                  "dependencies {\n" + recycler,
+                  1
+              )
+
+          with open(path, "w") as f:
+              f.write(content)
+          EOF
+
       - name: Patch AndroidManifest
         run: |
           python3 - <<'EOF'
@@ -112,9 +133,19 @@ jobs:
           cp native/VamshiNotificationListenerService.java android/app/src/main/java/com/vamshi/ai/VamshiNotificationListenerService.java
           cp native/VamshiApp.java android/app/src/main/java/com/vamshi/ai/VamshiApp.java
           cp native/MainActivity.java android/app/src/main/java/com/vamshi/ai/MainActivity.java
+          cp native/ChatMessage.java android/app/src/main/java/com/vamshi/ai/ChatMessage.java
+          cp native/ChatAdapter.java android/app/src/main/java/com/vamshi/ai/ChatAdapter.java
 
           mkdir -p android/app/src/main/res/xml
           cp native/accessibility_service_config.xml android/app/src/main/res/xml/accessibility_service_config.xml
+
+          mkdir -p android/app/src/main/res/layout
+          cp native/activity_main.xml android/app/src/main/res/layout/activity_main.xml
+          cp native/chat_item.xml android/app/src/main/res/layout/chat_item.xml
+
+          mkdir -p android/app/src/main/res/drawable
+          cp native/bubble_user.xml android/app/src/main/res/drawable/bubble_user.xml
+          cp native/bubble_bot.xml android/app/src/main/res/drawable/bubble_bot.xml
 
           python3 - <<'EOF'
           from pathlib import Path
