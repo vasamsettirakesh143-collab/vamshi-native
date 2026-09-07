@@ -37,6 +37,8 @@ import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class VamshiForegroundService extends Service implements RecognitionListener {
 
@@ -53,6 +55,14 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     private boolean listeningEnabled = false;
     private boolean awaitingFollowUp = false;
     private boolean awaitingCallName = false;
+
+    /*
+     * NEW:
+     * Set when Vamshi asks "who should I send the
+     * WhatsApp message to?" so the next spoken
+     * sentence is treated as the contact name.
+     */
+    private boolean awaitingWhatsAppName = false;
 
     @Override
     public void onCreate() {
@@ -274,6 +284,22 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                 matches.get(0)
                         .toLowerCase(Locale.US);
 
+        /*
+         * NEW:
+         * Follow-up for "send whatsapp to..." with
+         * no contact name given.
+         */
+        if (awaitingWhatsAppName) {
+
+            awaitingWhatsAppName = false;
+
+            handleWhatsAppCommand(
+                    "send whatsapp to " + heard.trim()
+            );
+
+            return;
+        }
+
         if (awaitingCallName) {
 
             awaitingCallName = false;
@@ -347,6 +373,20 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             speak("Yes?");
 
             restartListeningSoon();
+
+            return;
+        }
+
+        /*
+         * NEW:
+         * WhatsApp messaging commands. Checked BEFORE
+         * the "open " and "call " handlers so phrases
+         * like "open whatsapp chat with amma" and
+         * "send whatsapp to amma" are not eaten by them.
+         */
+        if (command.contains("whatsapp")) {
+
+            handleWhatsAppCommand(command);
 
             return;
         }
@@ -484,7 +524,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         if (command.equals("hi")
                 || command.equals("hello")
                 || command.equals("hey")
-                || command.startsWith("hi ")
+                command.startsWith("hi ")
                 || command.startsWith("hello ")
                 || command.startsWith("hey ")) {
 
@@ -514,6 +554,388 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         }
 
         askAINative(command);
+    }
+
+    /*
+     * NEW:
+     * Handles WhatsApp commands heard by voice:
+     *
+     *   "send whatsapp message to amma saying hi"
+     *   "send whatsapp to amma hi"
+     *   "whatsapp amma saying hi"
+     *   "tell amma on whatsapp that hi"
+     *   "open whatsapp chat with amma"
+     *   "open whatsapp" -> opens the WhatsApp app itself
+     *
+     * Also handles bare "send whatsapp" by asking
+     * for the contact name as a follow-up.
+     */
+    private void handleWhatsAppCommand(String command) {
+
+        String text =
+                command == null
+                        ? ""
+                        : command.trim();
+
+        // Bare "whatsapp" / "send whatsapp" handling.
+        // "open whatsapp" alone still opens the app,
+        // like any other app name.
+        boolean hasTarget =
+                text.matches(".*\\b(?:to|with)\\s+.+")
+                        || text.matches("^whatsapp\\s+.+");
+
+        if (!hasTarget) {
+
+            if (text.startsWith("open whatsapp")
+                    || text.equals("whatsapp")) {
+
+                openAnyApp("whatsapp");
+
+                return;
+            }
+
+            speak(
+                    "Who should I send the WhatsApp message to?"
+            );
+
+            awaitingWhatsAppName = true;
+
+            restartListeningSoon();
+
+            return;
+        }
+
+        String contactName = null;
+        String message = null;
+        boolean openChatOnly = false;
+
+        /*
+         * Pattern 1:
+         * "send whatsapp [message] to <contact> saying/telling/that <message>"
+         */
+        Matcher m = Pattern.compile(
+                "send\\s+whatsapp(?:\\s+message)?\\s+to\\s+(.+?)\\s+(?:saying|telling|that)\\s+(.+)"
+        ).matcher(text);
+
+        if (m.find()) {
+            contactName = m.group(1).trim();
+            message = m.group(2).trim();
+        }
+
+        /*
+         * Pattern 2:
+         * "send whatsapp to <contact> <message>"
+         * (message is everything after the contact phrase
+         * up to "saying"/"that" if present, otherwise all
+         * remaining words after the first 1-2 words).
+         */
+        if (contactName == null) {
+
+            m = Pattern.compile(
+                    "send\\s+whatsapp(?:\\s+message)?\\s+to\\s+(.+)"
+            ).matcher(text);
+
+            if (m.find()) {
+
+                String rest = m.group(1).trim();
+
+                String[] parts =
+                        rest.split("\\s+(?:saying|that)\\s+", 2);
+
+                if (parts.length == 2) {
+
+                    contactName = parts[0].trim();
+                    message = parts[1].trim();
+
+                } else {
+
+                    /*
+                     * No "saying" keyword. The contact is
+                     * normally the first word ("send whatsapp
+                     * to amma hi"), but spoken names can be
+                     * two words ("rakesh brother"). Use the
+                     * first word as the contact and the rest
+                     * as the message; if there is no rest,
+                     * the whole thing is the contact name.
+                     */
+                    String[] words = rest.split("\\s+", 2);
+
+                    contactName = words[0].trim();
+
+                    if (words.length > 1) {
+                        message = words[1].trim();
+                    }
+                }
+            }
+        }
+
+        /*
+         * Pattern 3:
+         * "tell <contact> on whatsapp [that] <message>"
+         */
+        if (contactName == null) {
+
+            m = Pattern.compile(
+                    "tell\\s+(.+?)\\s+on\\s+whatsapp\\s+(?:that\\s+)?(.+)"
+            ).matcher(text);
+
+            if (m.find()) {
+                contactName = m.group(1).trim();
+                message = m.group(2).trim();
+            }
+        }
+
+        /*
+         * Pattern 4:
+         * "whatsapp <contact> saying [message]"
+         */
+        if (contactName == null) {
+
+            m = Pattern.compile(
+                    "^whatsapp\\s+(.+?)\\s+(?:saying|that)\\s+(.+)"
+            ).matcher(text);
+
+            if (m.find()) {
+                contactName = m.group(1).trim();
+                message = m.group(2).trim();
+            }
+        }
+
+        /*
+         * Pattern 5:
+         * "open whatsapp chat with <contact>" -> chat only.
+         */
+        if (contactName == null) {
+
+            m = Pattern.compile(
+                    "(?:open|start)\\s+whatsapp\\s+chat\\s+with\\s+(.+)"
+            ).matcher(text);
+
+            if (m.find()) {
+
+                contactName = m.group(1).trim();
+                message = "";
+                openChatOnly = true;
+            }
+        }
+
+        /*
+         * Pattern 6:
+         * "whatsapp <contact>" alone -> chat only.
+         */
+        if (contactName == null) {
+
+            m = Pattern.compile(
+                    "^whatsapp\\s+(.+)$"
+            ).matcher(text);
+
+            if (m.find()) {
+
+                contactName = m.group(1).trim();
+                message = "";
+                openChatOnly = true;
+            }
+        }
+
+        if (contactName == null || contactName.isEmpty()) {
+
+            speak(
+                    "Who should I send the WhatsApp message to?"
+            );
+
+            awaitingWhatsAppName = true;
+
+            restartListeningSoon();
+
+            return;
+        }
+
+        // Strip filler words from the contact name.
+        contactName = contactName
+                .replaceAll("\\s+(?:app|please|now)$", "")
+                .trim();
+
+        if (openChatOnly || message == null || message.isEmpty()) {
+
+            openWhatsAppChat(contactName);
+
+            return;
+        }
+
+        sendWhatsAppToContact(contactName, message);
+    }
+
+    /*
+     * NEW:
+     * Resolves the spoken name to a contact and opens
+     * WhatsApp in that chat with the message pre-filled,
+     * using the same wa.me approach as the chat path.
+     */
+    private void sendWhatsAppToContact(
+            String spokenName,
+            String message
+    ) {
+
+        boolean hasContactsPermission =
+                ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.READ_CONTACTS
+                ) == PackageManager.PERMISSION_GRANTED;
+
+        if (!hasContactsPermission) {
+
+            speak(
+                    "I don't have contacts permission yet. Please open the app and grant the contacts permission."
+            );
+
+            restartListeningSoon();
+
+            return;
+        }
+
+        try {
+
+            ContactLookupUtil.Contact contact =
+                    ContactLookupUtil.findBestMatch(
+                            this,
+                            spokenName
+                    );
+
+            if (contact == null) {
+
+                speak(
+                        "I could not find a contact named "
+                                + spokenName
+                );
+
+                restartListeningSoon();
+
+                return;
+            }
+
+            String digits =
+                    contact.number.replaceAll("[^0-9]", "");
+
+            if (digits.isEmpty()) {
+
+                speak(
+                        contact.name
+                                + " has no usable phone number."
+                );
+
+                restartListeningSoon();
+
+                return;
+            }
+
+            if (digits.length() == 10) {
+                digits = "91" + digits;
+            }
+
+            String encodedText = Uri.encode(message);
+
+            /*
+             * Attempt 1: wa.me pinned to WhatsApp.
+             */
+            try {
+
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+
+                intent.setData(Uri.parse(
+                        "https://wa.me/" + digits
+                                + "?text=" + encodedText
+                ));
+
+                intent.setPackage("com.whatsapp");
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+                startActivity(intent);
+
+                speakWhatsAppConfirmation(contact.name);
+                return;
+
+            } catch (Exception ignored) {
+            }
+
+            /*
+             * Attempt 2: wa.me unpinned.
+             */
+            try {
+
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+
+                intent.setData(Uri.parse(
+                        "https://wa.me/" + digits
+                                + "?text=" + encodedText
+                ));
+
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+                startActivity(intent);
+
+                speakWhatsAppConfirmation(contact.name);
+                return;
+
+            } catch (Exception ignored) {
+            }
+
+            /*
+             * Attempt 3: whatsapp:// deep link.
+             */
+            try {
+
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+
+                intent.setData(Uri.parse(
+                        "whatsapp://send?phone=" + digits
+                                + "&text=" + encodedText
+                ));
+
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+                startActivity(intent);
+
+                speakWhatsAppConfirmation(contact.name);
+
+            } catch (Exception e) {
+
+                speak(
+                        "Sorry, I could not open WhatsApp."
+                );
+            }
+
+        } catch (Exception e) {
+
+            speak(
+                    "WhatsApp error: "
+                            + e.getClass().getSimpleName()
+            );
+        }
+
+        restartListeningSoon();
+    }
+
+    /*
+     * NEW:
+     * Opens a WhatsApp chat without a message.
+     */
+    private void openWhatsAppChat(String spokenName) {
+        sendWhatsAppToContact(spokenName, "");
+    }
+
+    /*
+     * NEW:
+     * Confirmation message.
+     */
+    private void speakWhatsAppConfirmation(String contactName) {
+
+        speak(
+                "WhatsApp chat with "
+                        + contactName
+                        + " is open. Tap send when ready."
+        );
+
+        restartListeningSoon();
     }
 
     private void navigateWithMaps(String destination) {
@@ -866,7 +1288,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                         "Debug: request timed out.";
 
             } catch (
-                    java.net.UnknownHostException e
+                java.net.UnknownHostException e
             ) {
 
                 reply =
