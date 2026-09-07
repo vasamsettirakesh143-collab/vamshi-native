@@ -1,166 +1,481 @@
 package com.vamshi.ai;
 
 import android.Manifest;
-import android.app.AlertDialog;
-import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.provider.Settings;
-import android.widget.ScrollView;
-import android.widget.TextView;
+import android.speech.RecognitionListener;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
+import android.speech.tts.TextToSpeech;
+import android.view.View;
+import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.Toast;
+
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import com.getcapacitor.BridgeActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
-import java.io.File;
-import java.io.FileInputStream;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Locale;
 
-public class MainActivity extends BridgeActivity {
+public class MainActivity extends AppCompatActivity {
 
-    private static final int PERMISSION_REQUEST_CODE = 2001;
+    private static final String BACKEND_URL =
+            "https://vamshi-backend-y6ja.onrender.com/chat";
+    private static final String ACTION_URL =
+            "https://vamshi-backend-y6ja.onrender.com/action";
+
+    private static final int REQUEST_MIC = 1;
+
+    private RecyclerView chatRecyclerView;
+    private ChatAdapter chatAdapter;
+    private EditText messageInput;
+    private ImageButton sendButton;
+    private ImageButton micButton;
+
+    private TextToSpeech textToSpeech;
+    private SpeechRecognizer speechRecognizer;
+    private boolean ttsReady = false;
+
+    private final ArrayList<ChatMessage> chatMessages =
+            new ArrayList<>();
 
     @Override
-    public void onCreate(Bundle savedInstanceState) {
-        registerPlugin(AppLauncherNativePlugin.class);
+    protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
 
-        showLastCrashIfAny();
-        promptAccessibilityIfNeeded();
-        promptNotificationAccessIfNeeded();
-        requestNeededPermissions();
-    }
+        chatRecyclerView = findViewById(R.id.chatRecyclerView);
+        messageInput = findViewById(R.id.messageInput);
+        sendButton = findViewById(R.id.sendButton);
+        micButton = findViewById(R.id.micButton);
 
-    private void showLastCrashIfAny() {
-        try {
-            File file = new File(getFilesDir(), "crash_log.txt");
-            if (!file.exists()) return;
+        chatAdapter = new ChatAdapter(chatMessages);
 
-            FileInputStream fis = new FileInputStream(file);
-            byte[] data = new byte[(int) file.length()];
-            fis.read(data);
-            fis.close();
-            file.delete();
+        chatRecyclerView.setLayoutManager(
+                new LinearLayoutManager(this));
 
-            String crashText = new String(data);
+        chatRecyclerView.setAdapter(chatAdapter);
 
-            TextView textView = new TextView(this);
-            textView.setText(crashText);
-            textView.setPadding(32, 32, 32, 32);
-            textView.setTextIsSelectable(true);
+        chatMessages.add(new ChatMessage(
+                "Hello Rakesh. I'm Vamshi — type or tap the mic to talk to me.",
+                false));
 
-            ScrollView scrollView = new ScrollView(this);
-            scrollView.addView(textView);
+        chatAdapter.notifyDataSetChanged();
 
-            new AlertDialog.Builder(this)
-                .setTitle("Last crash")
-                .setView(scrollView)
-                .setPositiveButton("OK", null)
-                .show();
+        initTextToSpeech();
 
-        } catch (Exception ignored) {
-        }
-    }
+        sendButton.setOnClickListener(v -> {
 
-    private boolean isAccessibilityServiceEnabled() {
-        ComponentName expected = new ComponentName(this, VamshiAccessibilityService.class);
-        String enabledServices = Settings.Secure.getString(
-            getContentResolver(),
-            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-        );
-        return enabledServices != null && enabledServices.contains(expected.flattenToString());
-    }
+            String text = messageInput.getText()
+                    .toString()
+                    .trim();
 
-    private void promptAccessibilityIfNeeded() {
-        if (isAccessibilityServiceEnabled()) {
-            return;
-        }
+            if (!text.isEmpty()) {
+                messageInput.setText("");
+                handleUserInput(text);
+            }
+        });
 
-        new AlertDialog.Builder(this)
-            .setTitle("One-time setup needed")
-            .setMessage("For Vamshi to open apps for you automatically, turn on \"Vamshi AI\" under Accessibility settings on the next screen.")
-            .setPositiveButton("Open Settings", (dialog, which) -> {
-                startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-            })
-            .setNegativeButton("Skip", null)
-            .show();
-    }
+        micButton.setOnClickListener(v -> {
 
-    private boolean isNotificationAccessEnabled() {
-        String enabledListeners = Settings.Secure.getString(
-            getContentResolver(),
-            "enabled_notification_listeners"
-        );
-        return enabledListeners != null && enabledListeners.contains(getPackageName());
-    }
+            boolean hasMic =
+                    ContextCompat.checkSelfPermission(
+                            this,
+                            Manifest.permission.RECORD_AUDIO
+                    ) == PackageManager.PERMISSION_GRANTED;
 
-    private void promptNotificationAccessIfNeeded() {
-        if (isNotificationAccessEnabled()) {
-            return;
-        }
+            if (!hasMic) {
 
-        new AlertDialog.Builder(this)
-            .setTitle("One more setup step")
-            .setMessage("For Vamshi to read your notifications aloud, turn on \"Vamshi AI\" under Notification Access on the next screen.")
-            .setPositiveButton("Open Settings", (dialog, which) -> {
-                startActivity(new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"));
-            })
-            .setNegativeButton("Skip", null)
-            .show();
-    }
+                ActivityCompat.requestPermissions(
+                        this,
+                        new String[]{Manifest.permission.RECORD_AUDIO},
+                        REQUEST_MIC
+                );
 
-    private void requestNeededPermissions() {
-        List<String> toRequest = new ArrayList<>();
+                return;
+            }
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            startVoiceInput();
+        });
+
+        // Ask for permissions needed by the service.
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(this,
+                Manifest.permission.READ_CONTACTS)
+                != PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(this,
+                Manifest.permission.CALL_PHONE)
                 != PackageManager.PERMISSION_GRANTED) {
-            toRequest.add(Manifest.permission.RECORD_AUDIO);
-        }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED) {
-            toRequest.add(Manifest.permission.POST_NOTIFICATIONS);
-        }
-
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE)
-                != PackageManager.PERMISSION_GRANTED) {
-            toRequest.add(Manifest.permission.CALL_PHONE);
-        }
-
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS)
-                != PackageManager.PERMISSION_GRANTED) {
-            toRequest.add(Manifest.permission.READ_CONTACTS);
-        }
-
-        if (!toRequest.isEmpty()) {
             ActivityCompat.requestPermissions(
-                this,
-                toRequest.toArray(new String[0]),
-                PERMISSION_REQUEST_CODE
+                    this,
+                    new String[]{
+                            Manifest.permission.RECORD_AUDIO,
+                            Manifest.permission.READ_CONTACTS,
+                            Manifest.permission.CALL_PHONE
+                    },
+                    REQUEST_MIC
             );
+        }
+
+        startForegroundService();
+    }
+
+    private void startForegroundService() {
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(
+                    new Intent(this, VamshiForegroundService.class));
         } else {
-            startVamshiService();
+            startService(
+                    new Intent(this, VamshiForegroundService.class));
+        }
+    }
+
+    private void initTextToSpeech() {
+
+        textToSpeech = new TextToSpeech(this, status -> {
+
+            if (status == TextToSpeech.SUCCESS
+                    && textToSpeech != null) {
+
+                textToSpeech.setLanguage(Locale.US);
+                ttsReady = true;
+            }
+        });
+    }
+
+    private void startVoiceInput() {
+
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            Toast.makeText(this,
+                    "Speech recognition not available",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (speechRecognizer == null) {
+
+            speechRecognizer =
+                    SpeechRecognizer.createSpeechRecognizer(this);
+
+            speechRecognizer.setRecognitionListener(
+                    new RecognitionListener() {
+
+                        @Override
+                        public void onResults(Bundle results) {
+
+                            ArrayList<String> matches =
+                                    results.getStringArrayList(
+                                            SpeechRecognizer.RESULTS_RECOGNITION);
+
+                            if (matches != null
+                                    && !matches.isEmpty()) {
+
+                                String heard =
+                                        matches.get(0).trim();
+
+                                if (!heard.isEmpty()) {
+                                    handleUserInput(heard);
+                                }
+                            }
+                        }
+
+                        @Override
+                        public void onError(int error) {
+                            Toast.makeText(MainActivity.this,
+                                    "Didn't catch that, try again",
+                                    Toast.LENGTH_SHORT).show();
+                        }
+
+                        @Override
+                        public void onReadyForSpeech(Bundle params) {
+                        }
+
+                        @Override
+                        public void onBeginningOfSpeech() {
+                        }
+
+                        @Override
+                        public void onRmsChanged(float rmsdB) {
+                        }
+
+                        @Override
+                        public void onBufferReceived(byte[] buffer) {
+                        }
+
+                        @Override
+                        public void onEndOfSpeech() {
+                        }
+
+                        @Override
+                        public void onPartialResults(Bundle partialResults) {
+                        }
+
+                        @Override
+                        public void onEvent(int eventType, Bundle params) {
+                        }
+                    });
+        }
+
+        Intent intent =
+                new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+
+        intent.putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+
+        intent.putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE,
+                Locale.US);
+
+        speechRecognizer.startListening(intent);
+    }
+
+    /*
+     * THE FIX:
+     * Typed text now goes through the same
+     * Jarvis brain as voice commands.
+     */
+    private void handleUserInput(String text) {
+
+        chatMessages.add(new ChatMessage(text, true));
+        chatAdapter.notifyItemInserted(
+                chatMessages.size() - 1);
+        chatRecyclerView.scrollToPosition(
+                chatMessages.size() - 1);
+
+        runOnUiThread(() ->
+                new Thread(() -> {
+
+                    // Step 1: ask the brain if this is an action.
+                    String actionJson = null;
+
+                    try {
+
+                        URL actionUrl = new URL(ACTION_URL);
+
+                        HttpURLConnection actionConn =
+                                (HttpURLConnection)
+                                        actionUrl.openConnection();
+
+                        actionConn.setRequestMethod("POST");
+                        actionConn.setRequestProperty(
+                                "Content-Type", "application/json");
+                        actionConn.setDoOutput(true);
+                        actionConn.setConnectTimeout(45000);
+                        actionConn.setReadTimeout(45000);
+
+                        JSONObject actionBody = new JSONObject();
+                        actionBody.put("message", text);
+
+                        OutputStream aos =
+                                actionConn.getOutputStream();
+
+                        aos.write(actionBody.toString()
+                                .getBytes("UTF-8"));
+                        aos.close();
+
+                        int actionStatus =
+                                actionConn.getResponseCode();
+
+                        if (actionStatus < 400) {
+
+                            BufferedReader abr =
+                                    new BufferedReader(
+                                            new InputStreamReader(
+                                                    actionConn.getInputStream()));
+
+                            StringBuilder asb = new StringBuilder();
+                            String aline;
+
+                            while ((aline = abr.readLine()) != null) {
+                                asb.append(aline);
+                            }
+
+                            abr.close();
+
+                            JSONObject actionResp =
+                                    new JSONObject(asb.toString());
+
+                            if (actionResp.has("action")
+                                    && !actionResp.isNull("action")) {
+
+                                actionJson =
+                                        actionResp.getJSONObject("action")
+                                                .toString();
+                            }
+                        }
+
+                        actionConn.disconnect();
+
+                    } catch (Exception ignored) {
+                        // Fall through to normal chat.
+                    }
+
+                    // Step 2: run the action.
+                    if (actionJson != null) {
+
+                        final String actionFinal = actionJson;
+
+                        runOnUiThread(() -> {
+
+                            runAiAction(actionFinal);
+                            addBotMessage("On it! 👍");
+                        });
+
+                        return;
+                    }
+
+                    // Step 3: normal chat reply.
+                    String reply;
+
+                    try {
+
+                        URL url = new URL(BACKEND_URL);
+
+                        HttpURLConnection conn =
+                                (HttpURLConnection)
+                                        url.openConnection();
+
+                        conn.setRequestMethod("POST");
+                        conn.setRequestProperty(
+                                "Content-Type", "application/json");
+                        conn.setDoOutput(true);
+                        conn.setConnectTimeout(45000);
+                        conn.setReadTimeout(45000);
+
+                        JSONObject body = new JSONObject();
+                        body.put("message", text);
+
+                        OutputStream os = conn.getOutputStream();
+                        os.write(body.toString().getBytes("UTF-8"));
+                        os.close();
+
+                        int statusCode = conn.getResponseCode();
+
+                        BufferedReader br = new BufferedReader(
+                                new InputStreamReader(
+                                        statusCode >= 400
+                                                ? conn.getErrorStream()
+                                                : conn.getInputStream()));
+
+                        StringBuilder sb = new StringBuilder();
+                        String line;
+
+                        while ((line = br.readLine()) != null) {
+                            sb.append(line);
+                        }
+
+                        br.close();
+
+                        if (statusCode >= 400) {
+                            reply = "Backend error code " + statusCode;
+                        } else {
+                            JSONObject respJson =
+                                    new JSONObject(sb.toString());
+                            reply = respJson.optString("reply",
+                                    "Sorry, I could not get a reply.");
+                        }
+
+                    } catch (java.net.SocketTimeoutException e) {
+                        reply = "The request timed out.";
+                    } catch (java.net.UnknownHostException e) {
+                        reply = "No internet connection.";
+                    } catch (Exception e) {
+                        reply = "Error: "
+                                + e.getClass().getSimpleName();
+                    }
+
+                    final String finalReply = reply;
+
+                    runOnUiThread(() -> addBotMessage(finalReply));
+
+                }).start());
+    }
+
+    /*
+     * Same action executor as the service.
+     */
+    private void runAiAction(String actionJson) {
+
+        try {
+
+            JSONObject action = new JSONObject(actionJson);
+
+            String type = action.optString("type", "");
+            String contact = action.optString("contact", "");
+            String msg = action.optString("message", "");
+            String appName = action.optString("app", "");
+            String destination = action.optString("destination", "");
+
+            Intent serviceIntent =
+                    new Intent(this, VamshiForegroundService.class);
+
+            serviceIntent.putExtra("ai_type", type);
+            serviceIntent.putExtra("ai_contact", contact);
+            serviceIntent.putExtra("ai_message", msg);
+            serviceIntent.putExtra("ai_app", appName);
+            serviceIntent.putExtra("ai_destination", destination);
+
+            startService(serviceIntent);
+
+        } catch (Exception e) {
+            addBotMessage("Action error: "
+                    + e.getClass().getSimpleName());
+        }
+    }
+
+    private void addBotMessage(String text) {
+
+        chatMessages.add(new ChatMessage(text, false));
+        chatAdapter.notifyItemInserted(
+                chatMessages.size() - 1);
+        chatRecyclerView.scrollToPosition(
+                chatMessages.size() - 1);
+
+        speak(text);
+    }
+
+    private void speak(String text) {
+
+        if (ttsReady && textToSpeech != null) {
+            textToSpeech.speak(
+                    text,
+                    TextToSpeech.QUEUE_FLUSH,
+                    null,
+                    "vamshi_chat_utterance");
         }
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == PERMISSION_REQUEST_CODE) {
-            startVamshiService();
-        }
-    }
+    protected void onDestroy() {
 
-    private void startVamshiService() {
-        Intent serviceIntent = new Intent(this, VamshiForegroundService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent);
-        } else {
-            startService(serviceIntent);
+        super.onDestroy();
+
+        if (speechRecognizer != null) {
+            speechRecognizer.destroy();
+        }
+
+        if (textToSpeech != null) {
+            textToSpeech.shutdown();
         }
     }
 }
