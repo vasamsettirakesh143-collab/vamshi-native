@@ -48,7 +48,7 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
     private TextView statusText;
 
     private ChatAdapter chatAdapter;
-    private java.util.List<ChatMessage> chatMessages;
+    private java.util.ArrayList<ChatMessage> chatMessages;
 
     private SpeechRecognizer speechRecognizer;
     private boolean micActive = false;
