@@ -86,6 +86,62 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             startForeground(NOTIFICATION_ID, notification);
         }
 
+        // Handle AI actions forwarded from MainActivity chat.
+        if (intent != null && intent.hasExtra("ai_type")) {
+
+            String type = intent.getStringExtra("ai_type");
+
+            if (type != null && !type.isEmpty()) {
+
+                String contact = intent.getStringExtra("ai_contact");
+                String msg = intent.getStringExtra("ai_message");
+                String appName = intent.getStringExtra("ai_app");
+                String destination = intent.getStringExtra("ai_destination");
+
+                if (contact == null) {
+                    contact = "";
+                }
+                if (msg == null) {
+                    msg = "";
+                }
+                if (appName == null) {
+                    appName = "";
+                }
+                if (destination == null) {
+                    destination = "";
+                }
+
+                switch (type) {
+
+                    case "whatsapp":
+                        if (msg.isEmpty()) {
+                            openWhatsAppChat(contact);
+                        } else {
+                            sendWhatsAppToContact(contact, msg);
+                        }
+                        break;
+
+                    case "call":
+                        handleCallCommand(contact);
+                        break;
+
+                    case "open_app":
+                        openAnyApp(appName);
+                        break;
+
+                    case "navigate":
+                        navigateWithMaps(destination);
+                        break;
+
+                    default:
+                        speak("Sorry, I could not perform that action.");
+                        break;
+                }
+            }
+
+            return START_STICKY;
+        }
+
         if (hasMic && !listeningEnabled) {
             listeningEnabled = true;
             initTextToSpeech();
@@ -629,7 +685,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
     private void handleCallCommand(String spokenName) {
 
-        if (spokenName.isEmpty()) {
+        if (spokenName == null || spokenName.isEmpty()) {
             speak("Who do you want to call?");
             awaitingCallName = true;
             restartListeningSoon();
@@ -679,7 +735,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
     private void openAnyApp(String spokenAppName) {
 
-        if (spokenAppName.isEmpty()) {
+        if (spokenAppName == null || spokenAppName.isEmpty()) {
             speak("Which app do you want to open?");
             restartListeningSoon();
             return;
