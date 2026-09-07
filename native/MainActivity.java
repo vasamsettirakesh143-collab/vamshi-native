@@ -9,9 +9,9 @@ import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.speech.tts.TextToSpeech;
-import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
@@ -57,95 +57,145 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
 
-        chatRecyclerView = findViewById(R.id.chatRecyclerView);
-        messageInput = findViewById(R.id.messageInput);
-        sendButton = findViewById(R.id.sendButton);
-        micButton = findViewById(R.id.micButton);
+        try {
 
-        chatAdapter = new ChatAdapter(chatMessages);
+            setContentView(R.layout.activity_main);
 
-        chatRecyclerView.setLayoutManager(
-                new LinearLayoutManager(this));
+            chatRecyclerView = findViewById(R.id.chatRecyclerView);
+            messageInput = findViewById(R.id.messageInput);
+            sendButton = findViewById(R.id.sendButton);
+            micButton = findViewById(R.id.micButton);
 
-        chatRecyclerView.setAdapter(chatAdapter);
+            chatAdapter = new ChatAdapter(chatMessages);
 
-        chatMessages.add(new ChatMessage(
-                "Hello Rakesh. I'm Vamshi — type or tap the mic to talk to me.",
-                false));
+            chatRecyclerView.setLayoutManager(
+                    new LinearLayoutManager(this));
 
-        chatAdapter.notifyDataSetChanged();
+            chatRecyclerView.setAdapter(chatAdapter);
 
-        initTextToSpeech();
+            chatMessages.add(new ChatMessage(
+                    "Hello. I'm Vamshi — type or tap the mic to talk to me.",
+                    false));
 
-        sendButton.setOnClickListener(v -> {
+            chatAdapter.notifyDataSetChanged();
 
-            String text = messageInput.getText()
-                    .toString()
-                    .trim();
+            initTextToSpeech();
 
-            if (!text.isEmpty()) {
-                messageInput.setText("");
-                handleUserInput(text);
-            }
-        });
+            sendButton.setOnClickListener(v -> {
 
-        micButton.setOnClickListener(v -> {
+                String text = messageInput.getText()
+                        .toString()
+                        .trim();
 
-            boolean hasMic =
-                    ContextCompat.checkSelfPermission(
+                if (!text.isEmpty()) {
+                    messageInput.setText("");
+                    handleUserInput(text);
+                }
+            });
+
+            micButton.setOnClickListener(v -> {
+
+                boolean hasMic =
+                        ContextCompat.checkSelfPermission(
+                                this,
+                                Manifest.permission.RECORD_AUDIO
+                        ) == PackageManager.PERMISSION_GRANTED;
+
+                if (!hasMic) {
+
+                    ActivityCompat.requestPermissions(
                             this,
-                            Manifest.permission.RECORD_AUDIO
-                    ) == PackageManager.PERMISSION_GRANTED;
+                            new String[]{Manifest.permission.RECORD_AUDIO},
+                            REQUEST_MIC
+                    );
 
-            if (!hasMic) {
+                    return;
+                }
+
+                startVoiceInput();
+            });
+
+            if (ContextCompat.checkSelfPermission(this,
+                    Manifest.permission.RECORD_AUDIO)
+                    != PackageManager.PERMISSION_GRANTED
+                    || ContextCompat.checkSelfPermission(this,
+                    Manifest.permission.READ_CONTACTS)
+                    != PackageManager.PERMISSION_GRANTED
+                    || ContextCompat.checkSelfPermission(this,
+                    Manifest.permission.CALL_PHONE)
+                    != PackageManager.PERMISSION_GRANTED) {
 
                 ActivityCompat.requestPermissions(
                         this,
-                        new String[]{Manifest.permission.RECORD_AUDIO},
+                        new String[]{
+                                Manifest.permission.RECORD_AUDIO,
+                                Manifest.permission.READ_CONTACTS,
+                                Manifest.permission.CALL_PHONE
+                        },
                         REQUEST_MIC
                 );
-
-                return;
             }
 
-            startVoiceInput();
-        });
+            startForegroundService();
 
-        // Ask for permissions needed by the service.
-        if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.RECORD_AUDIO)
-                != PackageManager.PERMISSION_GRANTED
-                || ContextCompat.checkSelfPermission(this,
-                Manifest.permission.READ_CONTACTS)
-                != PackageManager.PERMISSION_GRANTED
-                || ContextCompat.checkSelfPermission(this,
-                Manifest.permission.CALL_PHONE)
-                != PackageManager.PERMISSION_GRANTED) {
+        } catch (Exception e) {
 
-            ActivityCompat.requestPermissions(
-                    this,
-                    new String[]{
-                            Manifest.permission.RECORD_AUDIO,
-                            Manifest.permission.READ_CONTACTS,
-                            Manifest.permission.CALL_PHONE
-                    },
-                    REQUEST_MIC
-            );
+            showCrash(e);
+        }
+    }
+
+    private void showCrash(Exception e) {
+
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("STARTUP ERROR:\n")
+          .append(e.getClass().getName())
+          .append("\n")
+          .append(e.getMessage())
+          .append("\n");
+
+        if (e.getCause() != null) {
+            sb.append("CAUSED BY:\n")
+              .append(e.getCause().toString());
         }
 
-        startForegroundService();
+        StackTraceElement[] stack = e.getStackTrace();
+
+        if (stack.length > 0) {
+            sb.append("\nAT: ")
+              .append(stack[0].toString());
+        }
+
+        TextView errorView = new TextView(this);
+
+        errorView.setText(sb.toString());
+        errorView.setTextColor(0xFFFF0000);
+        errorView.setPadding(40, 80, 40, 40);
+        errorView.setTextIsSelectable(true);
+        errorView.setTextSize(14);
+
+        setContentView(errorView);
     }
 
     private void startForegroundService() {
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(
-                    new Intent(this, VamshiForegroundService.class));
-        } else {
-            startService(
-                    new Intent(this, VamshiForegroundService.class));
+        try {
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(
+                        new Intent(this, VamshiForegroundService.class));
+            } else {
+                startService(
+                        new Intent(this, VamshiForegroundService.class));
+            }
+
+        } catch (Exception e) {
+
+            Toast.makeText(this,
+                    "Service error: "
+                            + e.getClass().getSimpleName(),
+                    Toast.LENGTH_LONG).show();
         }
     }
 
@@ -249,11 +299,6 @@ public class MainActivity extends AppCompatActivity {
         speechRecognizer.startListening(intent);
     }
 
-    /*
-     * THE FIX:
-     * Typed text now goes through the same
-     * Jarvis brain as voice commands.
-     */
     private void handleUserInput(String text) {
 
         chatMessages.add(new ChatMessage(text, true));
@@ -265,7 +310,6 @@ public class MainActivity extends AppCompatActivity {
         runOnUiThread(() ->
                 new Thread(() -> {
 
-                    // Step 1: ask the brain if this is an action.
                     String actionJson = null;
 
                     try {
@@ -327,10 +371,8 @@ public class MainActivity extends AppCompatActivity {
                         actionConn.disconnect();
 
                     } catch (Exception ignored) {
-                        // Fall through to normal chat.
                     }
 
-                    // Step 2: run the action.
                     if (actionJson != null) {
 
                         final String actionFinal = actionJson;
@@ -344,7 +386,6 @@ public class MainActivity extends AppCompatActivity {
                         return;
                     }
 
-                    // Step 3: normal chat reply.
                     String reply;
 
                     try {
@@ -411,9 +452,6 @@ public class MainActivity extends AppCompatActivity {
                 }).start());
     }
 
-    /*
-     * Same action executor as the service.
-     */
     private void runAiAction(String actionJson) {
 
         try {
