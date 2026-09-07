@@ -3,12 +3,15 @@ package com.vamshi.ai;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
-import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.TextView;
@@ -48,7 +51,7 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
     private TextView statusText;
 
     private ChatAdapter chatAdapter;
-    private java.util.ArrayList<ChatMessage> chatMessages;
+    private ArrayList<ChatMessage> chatMessages;
 
     private SpeechRecognizer speechRecognizer;
     private boolean micActive = false;
@@ -81,6 +84,28 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
 
             micButton.setOnClickListener(v -> toggleMic());
 
+            Button btnAccessibility =
+                    findViewById(R.id.btnAccessibility);
+
+            Button btnNotifications =
+                    findViewById(R.id.btnNotifications);
+
+            btnAccessibility.setOnClickListener(v -> {
+                try {
+                    startActivity(new Intent(
+                            Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                } catch (Exception ignored) {
+                }
+            });
+
+            btnNotifications.setOnClickListener(v -> {
+                try {
+                    startActivity(new Intent(
+                            Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
+                } catch (Exception ignored) {
+                }
+            });
+
             requestNeededPermissions();
 
             // Start the always-listening foreground service.
@@ -90,6 +115,8 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
             ContextCompat.startForegroundService(this, serviceIntent);
 
             checkAccessibilityPrompt();
+
+            requestIgnoreBatteryOptimization();
 
         } catch (Throwable e) {
 
@@ -117,9 +144,7 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
 
     /*
      * Prompts the user to enable the accessibility service
-     * if it is not already on. Android does not allow apps
-     * to enable it programmatically, so we deep-link to the
-     * settings page with one tap.
+     * if it is not already on.
      */
     private void checkAccessibilityPrompt() {
 
@@ -137,13 +162,35 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
                 .setPositiveButton("ENABLE", (dialog, which) -> {
                     try {
                         startActivity(new Intent(
-                                android.provider.Settings
-                                        .ACTION_ACCESSIBILITY_SETTINGS));
+                                Settings.ACTION_ACCESSIBILITY_SETTINGS));
                     } catch (Exception ignored) {
                     }
                 })
                 .setNegativeButton("Later", null)
                 .show();
+    }
+
+    /*
+     * Asks Android to never battery-kill Vamshi.
+     */
+    private void requestIgnoreBatteryOptimization() {
+
+        PowerManager pm =
+                (PowerManager) getSystemService(POWER_SERVICE);
+
+        if (pm == null) {
+            return;
+        }
+
+        if (!pm.isIgnoringBatteryOptimizations(getPackageName())) {
+
+            try {
+                startActivity(new Intent(
+                        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                        Uri.parse("package:" + getPackageName())));
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     private void requestNeededPermissions() {
@@ -347,8 +394,6 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
 
                 if (statusCode >= 400) {
 
-                    // The backend might return { "reply": [...] }
-                    // even with an error code, so still try to parse.
                     try {
                         JSONObject respJson = new JSONObject(sb.toString());
                         reply = extractReply(respJson);
