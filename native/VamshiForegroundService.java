@@ -521,12 +521,13 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             return;
         }
 
-        if (command.equals("hi")
+                if (command.equals("hi")
                 || command.equals("hello")
                 || command.equals("hey")
-                command.startsWith("hi ")
+                || command.startsWith("hi ")
                 || command.startsWith("hello ")
                 || command.startsWith("hey ")) {
+                    
 
             speak(
                     "Hello Rakesh. I am Vamshi."
