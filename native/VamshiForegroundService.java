@@ -46,6 +46,8 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     private static final int NOTIFICATION_ID = 1001;
     private static final String BACKEND_URL =
             "https://vamshi-backend-y6ja.onrender.com/chat";
+    private static final String ACTION_URL =
+            "https://vamshi-backend-y6ja.onrender.com/action";
 
     private SpeechRecognizer speechRecognizer;
     private TextToSpeech textToSpeech;
@@ -57,15 +59,13 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     private boolean awaitingCallName = false;
 
     /*
-     * NEW:
      * Set when Vamshi asks "who should I send the
      * WhatsApp message to?" so the next spoken
      * sentence is treated as the contact name.
      */
     private boolean awaitingWhatsAppName = false;
 
-    @Override
-    public void onCreate() {
+    @Override    public void onCreate() {
         super.onCreate();
         createNotificationChannel();
 
@@ -164,7 +164,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                         android.R.drawable.ic_btn_speak_now
                 )
                 .setContentIntent(pendingIntent)
-                .setOngoing(true)
+                .setOngoing)
                 .build();
     }
 
@@ -285,7 +285,6 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                         .toLowerCase(Locale.US);
 
         /*
-         * NEW:
          * Follow-up for "send whatsapp to..." with
          * no contact name given.
          */
@@ -340,29 +339,27 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
     private void searchYouTube(String query) {
 
-    if (!VamshiAccessibilityService.isRunning()) {
+        if (!VamshiAccessibilityService.isRunning()) {
 
-        speak("Please enable Vamshi accessibility service first.");
+            speak("Please enable Vamshi accessibility service first.");
+            restartListeningSoon();
+            return;
+        }
+
+        boolean started =
+                VamshiAccessibility.searchYouTube(query);
+
+        if (started) {
+
+            speak("Searching for " + query);
+
+        } else {
+
+            speak("Sorry, I could not start the YouTube search.");
+        }
+
         restartListeningSoon();
-        return;
     }
-
-    boolean started =
-            VamshiAccessibilityService.searchYouTube(query);
-
-    if (started) {
-
-        speak("Searching YouTube for " + query);
-
-    } else {
-
-        speak("Sorry, I could not start the YouTube search.");
-    }
-
-    restartListeningSoon();
-    }
-    
-
 
     private void handleCommand(String command) {
 
@@ -378,8 +375,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         }
 
         /*
-         * NEW:
-         * WhatsApp messaging commands. Checked BEFORE
+         * messaging commands. Checked BEFORE
          * the "open " and "call " handlers so phrases
          * like "open whatsapp chat with amma" and
          * "send whatsapp to amma" are not eaten by them.
@@ -391,8 +387,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             return;
         }
 
-        // Maps navigation command:
-        // "Open Maps and navigate to [destination]"
+        // Maps navigation command        // "Open Maps and navigate to [destination]"
         if (command.startsWith("open maps")
                 && command.contains("navigate to")) {
 
@@ -413,7 +408,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                 return;
             }
 
-            navigateWithMaps(destination);
+            navigateWith(destination);
 
             return;
         }
@@ -457,8 +452,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             return;
         }
 
-        if (command.equals("call")
-                || command.startsWith("call")) {
+        if (command.equals("call                || command.startsWith("call")) {
 
             handleCallCommand("");
 
@@ -521,13 +515,12 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             return;
         }
 
-                if (command.equals("hi")
+        if (command("hi")
                 || command.equals("hello")
                 || command.equals("hey")
                 || command.startsWith("hi ")
                 || command.startsWith("hello ")
                 || command.startsWith("hey ")) {
-                    
 
             speak(
                     "Hello Rakesh. I am Vamshi."
@@ -558,7 +551,6 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     }
 
     /*
-     * NEW:
      * Handles WhatsApp commands heard by voice:
      *
      *   "send whatsapp message to amma saying hi"
@@ -568,7 +560,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
      *   "open whatsapp chat with amma"
      *   "open whatsapp" -> opens the WhatsApp app itself
      *
-     * Also handles bare "send whatsapp" by asking
+     * handles bare "send whatsapp" by asking
      * for the contact name as a follow-up.
      */
     private void handleWhatsAppCommand(String command) {
@@ -587,7 +579,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
         if (!hasTarget) {
 
-            if (text.startsWith("open whatsapp")
+            if (text("open whatsapp")
                     || text.equals("whatsapp")) {
 
                 openAnyApp("whatsapp");
@@ -619,16 +611,13 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         ).matcher(text);
 
         if (m.find()) {
-            contactName = m.group(1).trim();
+            contactName = m.group(1trim();
             message = m.group(2).trim();
         }
 
         /*
          * Pattern 2:
          * "send whatsapp to <contact> <message>"
-         * (message is everything after the contact phrase
-         * up to "saying"/"that" if present, otherwise all
-         * remaining words after the first 1-2 words).
          */
         if (contactName == null) {
 
@@ -651,12 +640,12 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                 } else {
 
                     /*
-                     * No "saying" keyword. The contact is
-                     * normally the first word ("send whatsapp
-                     * to amma hi"), but spoken names can be
-                     * two words ("rakesh brother"). Use the
-                     * first word as the contact and the rest
-                     * as the message; if there is no rest,
+                     * No "saying". The contact is
+                     * normally the first word ("amma hi"),
+                     * but spoken names can be two words
+                     * ("rakesh brother"). Use the first
+                     * word as the contact and the rest as
+                     * the message; if there is no rest,
                      * the whole thing is the contact name.
                      */
                     String[] words = rest.split("\\s+", 2);
@@ -665,8 +654,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
                     if (words.length > 1) {
                         message = words[1].trim();
-                    }
-                }
+                                   }
             }
         }
 
@@ -677,7 +665,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         if (contactName == null) {
 
             m = Pattern.compile(
-                    "tell\\s+(.+?)\\s+on\\s+whatsapp\\s+(?:that\\s+)?(.+)"
+                    "tell\\s+(.+?)\\s+on\\s+whatsapp\\s?:that\\s+)?(.+)"
             ).matcher(text);
 
             if (m.find()) {
@@ -756,7 +744,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                 .replaceAll("\\s+(?:app|please|now)$", "")
                 .trim();
 
-        if (openChatOnly || message == null || message.isEmpty()) {
+        if (openChat || message == null || message.isEmpty()) {
 
             openWhatsAppChat(contactName);
 
@@ -767,7 +755,6 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     }
 
     /*
-     * NEW:
      * Resolves the spoken name to a contact and opens
      * WhatsApp in that chat with the message pre-filled,
      * using the same wa.me approach as the chat path.
@@ -917,7 +904,6 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     }
 
     /*
-     * NEW:
      * Opens a WhatsApp chat without a message.
      */
     private void openWhatsAppChat(String spokenName) {
@@ -925,7 +911,6 @@ public class VamshiForegroundService extends Service implements RecognitionListe
     }
 
     /*
-     * NEW:
      * Confirmation message.
      */
     private void speakWhatsAppConfirmation(String contactName) {
@@ -1177,12 +1162,125 @@ public class VamshiForegroundService extends Service implements RecognitionListe
         restartListeningSoon();
     }
 
+    /*
+     * JARVIS BRAIN:
+     * Step 1: ask the backend /action route if this is
+     *         a device action (AI decides, any phrasing).
+     * Step 2: if yes, run the action.
+     * Step 3: if no, fall back to normal /chat reply.
+     */
     private void askAINative(
             String message
     ) {
 
         new Thread(() -> {
 
+            // Step 1: ask the brain if this is an action.
+            String actionJson = null;
+
+            try {
+
+                URL actionUrl =
+                        new URL(
+                                ACTION_URL
+                        );
+
+                HttpURLConnection actionConn =
+                        (HttpURLConnection)
+                                actionUrl.openConnection();
+
+                actionConn.setRequestMethod("POST");
+
+                actionConn.setRequestProperty(
+                        "Content-Type",
+                        "application/json"
+                );
+
+                actionConn.setDoOutput(true);
+
+                actionConn.setConnectTimeout(45000);
+
+                actionConn.setReadTimeout(45000);
+
+                JSONObject actionBody =
+                        new JSONObject();
+
+                actionBody.put("message", message);
+
+                OutputStream aos =
+                        actionConn.getOutputStream();
+
+                aos.write(
+                        actionBody.toString()
+                                .getBytes("UTF-8")
+                );
+
+                aos.close();
+
+                int actionStatus =
+                        actionConn.getResponseCode();
+
+                if (actionStatus < 400) {
+
+                    BufferedReader abr =
+                            new BufferedReader(
+                                    new InputStreamReader(
+                                            actionConn.getInputStream()
+                                    )
+                            );
+
+                    StringBuilder asb =
+                            new StringBuilder();
+
+                    String aline;
+
+                    while (
+                            (aline = abr.readLine())
+                                    != null
+                    ) {
+                        asb.append(aline);
+                    }
+
+                    abr.close();
+
+                    JSONObject actionResp =
+                            new JSONObject(
+                                    asb.toString()
+                            );
+
+                    if (actionResp.has("action")
+                            && !actionResp.isNull("action")) {
+
+                        actionJson =
+                                actionResp.getJSONObject("action")
+                                        .toString();
+                    }
+                }
+
+                actionConn.disconnect();
+
+            } catch (Exception ignored) {
+                // Action check failed — fall through
+                // to normal chat.
+            }
+
+            // Step 2: if it IS an action, run it.
+            if (actionJson != null) {
+
+                final String actionFinal = actionJson;
+
+                handler.post(() -> {
+
+                    runAiAction(actionFinal);
+
+                    restartListeningSoon();
+
+                });
+
+                return;
+            }
+
+            // Step 3: not an action — normal chat reply.
             String reply;
 
             try {
@@ -1196,9 +1294,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                         (HttpURLConnection)
                                 url.openConnection();
 
-                conn.setRequestMethod(
-                        "POST"
-                );
+                conn.setRequestMethod("POST");
 
                 conn.setRequestProperty(
                         "Content-Type",
@@ -1207,30 +1303,21 @@ public class VamshiForegroundService extends Service implements RecognitionListe
 
                 conn.setDoOutput(true);
 
-                conn.setConnectTimeout(
-                        45000
-                );
+                conn.setConnectTimeout(45000);
 
-                conn.setReadTimeout(
-                        45000
-                );
+                conn.setReadTimeout(45000);
 
                 JSONObject body =
                         new JSONObject();
 
-                body.put(
-                        "message",
-                        message
-                );
+                body.put("message", message);
 
                 OutputStream os =
                         conn.getOutputStream();
 
                 os.write(
                         body.toString()
-                                .getBytes(
-                                        "UTF-8"
-                                )
+                                .getBytes("UTF-8")
                 );
 
                 os.close();
@@ -1289,7 +1376,7 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                         "Debug: request timed out.";
 
             } catch (
-                java.net.UnknownHostException e
+                    java.net.UnknownHostException e
             ) {
 
                 reply =
@@ -1317,6 +1404,72 @@ public class VamshiForegroundService extends Service implements RecognitionListe
             });
 
         }).start();
+    }
+
+    /*
+     * Executes an action decided by the AI brain.
+     * This is Jarvis mode: any phrasing works.
+     */
+    private void runAiAction(String actionJson) {
+
+        try {
+
+            JSONObject action =
+                    new JSONObject(actionJson);
+
+            String type =
+                    action.optString("type", "");
+
+            String contact =
+                    action.optString("contact", "");
+
+            String msg =
+                    action.optString("message", "");
+
+            String appName =
+                    action.optString("app", "");
+
+            String destination =
+                    action.optString("destination", "");
+
+            switch (type) {
+
+                case "whatsapp":
+
+                    if (msg.isEmpty()) {
+                        openWhatsAppChat(contact);
+                    } else {
+                        sendWhatsAppToContact(contact, msg);
+                    }
+                    break;
+
+                case "call":
+                    handleCallCommand(contact);
+                    break;
+
+                case "open_app":
+                    openAnyApp(appName);
+                    break;
+
+                case "navigate":
+                    navigateWithMaps(destination);
+                    break;
+
+                default:
+                    speak("Sorry, I could not perform that action.");
+                    restartListeningSoon();
+                    break;
+            }
+
+        } catch (Exception e) {
+
+            speak(
+                    "Action error: "
+                            + e.getClass().getSimpleName()
+            );
+
+            restartListeningSoon();
+        }
     }
 
     private void speak(String text) {
