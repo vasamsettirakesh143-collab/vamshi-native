@@ -82,12 +82,16 @@ public class AppLauncherNativePlugin extends Plugin {
     }
 
     /**
-     * Opens WhatsApp in a specific contact's chat with the
-     * message pre-filled, using the official SENDTO intent.
+     * Opens WhatsApp in a contact's chat with the message
+     * pre-filled. Tries three official WhatsApp entry
+     * points in order until one works:
      *
-     * NOTE: WhatsApp ignores the "sms_body" extra - it reads
-     * the message from Intent.EXTRA_TEXT. We set BOTH so the
-     * text is pre-filled reliably.
+     *   1. wa.me URL pinned to the WhatsApp package
+     *   2. wa.me URL unpinned (system routes it)
+     *   3. whatsapp://send deep link
+     *
+     * wa.me needs an international number, so 10-digit
+     * local numbers get "91" (India) prepended.
      */
     @PluginMethod
     public void sendWhatsApp(PluginCall call) {
@@ -107,31 +111,78 @@ public class AppLauncherNativePlugin extends Plugin {
             return;
         }
 
-        // Strip spaces, dashes and other characters WhatsApp does not want.
-        String number = contact.number.replaceAll("[^0-9+]", "");
+        String digits = contact.number.replaceAll("[^0-9]", "");
 
-        if (number.isEmpty()) {
+        if (digits.isEmpty()) {
             call.reject("Contact has no usable phone number: " + contact.name);
             return;
         }
 
-        Intent intent = new Intent(Intent.ACTION_SENDTO);
-        intent.setData(Uri.parse("smsto:" + Uri.encode(number)));
-        intent.setPackage("com.whatsapp");
-        intent.putExtra("sms_body", message == null ? "" : message);
-        intent.putExtra(Intent.EXTRA_TEXT, message == null ? "" : message);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        if (digits.length() == 10) {
+            digits = "91" + digits;
+        }
 
+        String text = message == null ? "" : message;
+        String encodedText = Uri.encode(text);
+
+        /*
+         * Attempt 1: wa.me pinned directly to WhatsApp.
+         */
         try {
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setData(Uri.parse(
+                "https://wa.me/" + digits + "?text=" + encodedText
+            ));
+            intent.setPackage("com.whatsapp");
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             getContext().startActivity(intent);
 
-            JSObject result = new JSObject();
-            result.put("success", true);
-            result.put("contact", contact.name);
-            result.put("number", number);
-            call.resolve(result);
+            resolveSuccess(call, contact.name, digits);
+            return;
+        } catch (Exception ignored) {
+            // Fall through to attempt 2.
+        }
+
+        /*
+         * Attempt 2: wa.me without pinning the package.
+         */
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setData(Uri.parse(
+                "https://wa.me/" + digits + "?text=" + encodedText
+            ));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+
+            resolveSuccess(call, contact.name, digits);
+            return;
+        } catch (Exception ignored) {
+            // Fall through to attempt 3.
+        }
+
+        /*
+         * Attempt 3: the whatsapp:// deep link scheme.
+         */
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setData(Uri.parse(
+                "whatsapp://send?phone=" + digits + "&text=" + encodedText
+            ));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+
+            resolveSuccess(call, contact.name, digits);
+            return;
         } catch (Exception error) {
             call.reject("Could not open WhatsApp: " + error.getMessage());
         }
+    }
+
+    private void resolveSuccess(PluginCall call, String name, String number) {
+        JSObject result = new JSObject();
+        result.put("success", true);
+        result.put("contact", name);
+        result.put("number", number);
+        call.resolve(result);
     }
 }
