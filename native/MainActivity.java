@@ -56,9 +56,10 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
 
         try {
+
+            super.onCreate(savedInstanceState);
 
             setContentView(R.layout.activity_main);
 
@@ -139,13 +140,13 @@ public class MainActivity extends AppCompatActivity {
 
             startForegroundService();
 
-        } catch (Exception e) {
+        } catch (Throwable e) {
 
             showCrash(e);
         }
     }
 
-    private void showCrash(Exception e) {
+    private void showCrash(Throwable e) {
 
         StringBuilder sb = new StringBuilder();
 
@@ -167,15 +168,23 @@ public class MainActivity extends AppCompatActivity {
               .append(stack[0].toString());
         }
 
-        TextView errorView = new TextView(this);
+        try {
 
-        errorView.setText(sb.toString());
-        errorView.setTextColor(0xFFFF0000);
-        errorView.setPadding(40, 80, 40, 40);
-        errorView.setTextIsSelectable(true);
-        errorView.setTextSize(14);
+            super.setContentView(
+                    new TextView(this));
 
-        setContentView(errorView);
+            TextView errorView = new TextView(this);
+
+            errorView.setText(sb.toString());
+            errorView.setTextColor(0xFFFF0000);
+            errorView.setPadding(40, 80, 40, 40);
+            errorView.setTextIsSelectable(true);
+            errorView.setTextSize(14);
+
+            super.setContentView(errorView);
+
+        } catch (Throwable ignore) {
+        }
     }
 
     private void startForegroundService() {
