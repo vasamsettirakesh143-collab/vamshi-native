@@ -1,8 +1,11 @@
 package com.vamshi.ai;
 
+import android.content.Intent;
+import android.net.Uri;
+
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
-import com.getcapacitor.PluginCall;
+import com.getcapitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
@@ -76,5 +79,56 @@ public class AppLauncherNativePlugin extends Plugin {
         JSObject result = new JSObject();
         result.put("success", ok);
         call.resolve(result);
+    }
+
+    /**
+     * Opens WhatsApp in a specific contact's chat with the
+     * message pre-filled, using the official SENDTO intent.
+     * WhatsApp requires the user to tap send - a deliberate
+     * safety feature on their side.
+     */
+    @PluginMethod
+    public void sendWhatsApp(PluginCall call) {
+        String contactName = call.getString("contactName");
+        String message = call.getString("message");
+
+        if (contactName == null || contactName.trim().isEmpty()) {
+            call.reject("contactName is required");
+            return;
+        }
+
+        ContactLookupUtil.Contact contact =
+            ContactLookupUtil.findBestMatch(getContext(), contactName.trim());
+
+        if (contact == null) {
+            call.reject("No contact matched: " + contactName);
+            return;
+        }
+
+        // Strip spaces, dashes and other characters WhatsApp does not want.
+        String number = contact.number.replaceAll("[^0-9+]", "");
+
+        if (number.isEmpty()) {
+            call.reject("Contact has no usable phone number: " + contact.name);
+            return;
+        }
+
+        Intent intent = new Intent(Intent.ACTION_SENDTO);
+        intent.setData(Uri.parse("smsto:" + Uri.encode(number)));
+        intent.setPackage("com.whatsapp");
+        intent.putExtra("sms_body", message == null ? "" : message);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+        try {
+            getContext().startActivity(intent);
+
+            JSObject result = new JSObject();
+            result.put("success", true);
+            result.put("contact", contact.name);
+            result.put("number", number);
+            call.resolve(result);
+        } catch (Exception error) {
+            call.reject("Could not open WhatsApp: " + error.getMessage());
+        }
     }
 }
