@@ -53,6 +53,8 @@ jobs:
       - name: Patch AndroidManifest
         run: |
           python3 - <<'EOF'
+          import re
+
           path = "android/app/src/main/AndroidManifest.xml"
 
           with open(path) as f:
@@ -70,9 +72,25 @@ jobs:
 
           content = content.replace(
               "<application",
-              permissions + '\n    <application\n        android:name=".VamshiApp"\n        android:theme="@style/Theme.AppCompat.NoActionBar"',
+              permissions + '\n    <application\n        android:name=".VamshiApp"',
               1
           )
+
+          theme = 'android:theme="@style/Theme.AppCompat.NoActionBar"'
+
+          if 'android:theme=' in content:
+              content = re.sub(
+                  r'android:theme="[^"]*"',
+                  theme,
+                  content,
+                  count=1
+              )
+          else:
+              content = content.replace(
+                  '<application',
+                  '<application\n        ' + theme,
+                  1
+              )
 
           service_decl = '''    <service
                 android:name=".VamshiForegroundService"
