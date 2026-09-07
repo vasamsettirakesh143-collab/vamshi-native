@@ -84,8 +84,10 @@ public class AppLauncherNativePlugin extends Plugin {
     /**
      * Opens WhatsApp in a specific contact's chat with the
      * message pre-filled, using the official SENDTO intent.
-     * WhatsApp requires the user to tap send - a deliberate
-     * safety feature on their side.
+     *
+     * NOTE: WhatsApp ignores the "sms_body" extra - it reads
+     * the message from Intent.EXTRA_TEXT. We set BOTH so the
+     * text is pre-filled reliably.
      */
     @PluginMethod
     public void sendWhatsApp(PluginCall call) {
@@ -117,6 +119,7 @@ public class AppLauncherNativePlugin extends Plugin {
         intent.setData(Uri.parse("smsto:" + Uri.encode(number)));
         intent.setPackage("com.whatsapp");
         intent.putExtra("sms_body", message == null ? "" : message);
+        intent.putExtra(Intent.EXTRA_TEXT, message == null ? "" : message);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
         try {
