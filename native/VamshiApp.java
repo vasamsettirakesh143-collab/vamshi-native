@@ -1,10 +1,7 @@
-package com.vamshi.ai;
-
 import android.app.Application;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.PrintWriter;
-import java.io.StringWriter;
+import android.os.Handler;
+import android.os.Looper;
+import android.widget.Toast;
 
 public class VamshiApp extends Application {
 
@@ -15,22 +12,48 @@ public class VamshiApp extends Application {
         final Thread.UncaughtExceptionHandler defaultHandler =
                 Thread.getDefaultUncaughtExceptionHandler();
 
-        Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
-            try {
-                StringWriter sw = new StringWriter();
-                throwable.printStackTrace(new PrintWriter(sw));
+        Thread.setDefaultUncaughtExceptionHandler(
+                new Thread.UncaughtExceptionHandler() {
 
-                File file = new File(getFilesDir(), "crash_log.txt");
-                FileOutputStream fos = new FileOutputStream(file);
-                fos.write(sw.toString().getBytes());
-                fos.close();
-            } catch (Exception ignored) {
-            }
+            @Override
+            public void uncaughtException(Thread thread, Throwable error) {
 
-            if (defaultHandler != null) {
-                defaultHandler.uncaughtException(thread, throwable);
-            } else {
-                System.exit(1);
+                try {
+
+                    String reason = "VAMSHI CRASH: "
+                            + error.getClass().getSimpleName()
+                            + " - " + error.getMessage();
+
+                    if (error.getCause() != null) {
+                        reason = reason + " CAUSED BY: "
+                                + error.getCause().getClass().getSimpleName()
+                                + " - " + error.getCause().getMessage();
+                    }
+
+                    final String finalReason = reason;
+
+                    Handler mainHandler = new Handler(Looper.getMainLooper());
+
+                    mainHandler.post(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            Toast.makeText(
+                                    getApplicationContext(),
+                                    finalReason,
+                                    Toast.LENGTH_LONG
+                            ).show();
+                        }
+                    });
+
+                    Thread.sleep(2500);
+
+                } catch (Exception ignored) {
+                }
+
+                if (defaultHandler != null) {
+                    defaultHandler.uncaughtException(thread, error);
+                }
             }
         });
     }
