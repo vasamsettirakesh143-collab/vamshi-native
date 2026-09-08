@@ -203,6 +203,8 @@ jobs:
           mkdir -p android/app/src/main/res/drawable
           cp native/bubble_user.xml android/app/src/main/res/drawable/bubble_user.xml
           cp native/bubble_bot.xml android/app/src/main/res/drawable/bubble_bot.xml
+          cp native/input_devil.xml android/app/src/main/res/drawable/input_devil.xml
+                    
 
           python3 - <<'EOF'
           from pathlib import Path
