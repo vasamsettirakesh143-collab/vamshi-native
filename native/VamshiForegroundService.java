@@ -22,6 +22,7 @@ import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.speech.tts.TextToSpeech;
+import android.speech.tts.Voice;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
@@ -38,6 +39,7 @@ import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -201,13 +203,102 @@ public class VamshiForegroundService extends Service implements RecognitionListe
                 .build();
     }
 
+    /*
+     * TextToSpeech with a MALE voice.
+     *
+     * Priority order:
+     *   1. Indian English male   (en-in-x-ene-...)
+     *   2. US English male       (en-us-x-iom / iog / its / iob / irr)
+     *   3. Any English voice whose name/data doesn't look female
+     *   4. Fallback: default US voice with lowered pitch (0.85)
+     */
     private void initTextToSpeech() {
 
         textToSpeech = new TextToSpeech(this, status -> {
 
-            if (status == TextToSpeech.SUCCESS && textToSpeech != null) {
-                textToSpeech.setLanguage(Locale.US);
+            if (status != TextToSpeech.SUCCESS || textToSpeech == null) {
+                return;
             }
+
+            textToSpeech.setLanguage(Locale.US);
+
+            boolean maleVoiceSet = false;
+
+            try {
+
+                Set<Voice> voices = textToSpeech.getVoices();
+
+                if (voices != null) {
+
+                    // 1. Known Google MALE voice name patterns,
+                    //    Indian English first.
+                    String[] malePatterns = {
+                            "en-in-x-ene",
+                            "en-us-x-iom",
+                            "en-us-x-iog",
+                            "en-us-x-its",
+                            "en-us-x-iob",
+                            "en-us-x-irr",
+                            "male"
+                    };
+
+                    for (String pattern : malePatterns) {
+
+                        for (Voice voice : voices) {
+
+                            String name = voice.getName().toLowerCase(Locale.US);
+
+                            if (name.contains(pattern)
+                                    && name.startsWith("en")) {
+
+                                textToSpeech.setVoice(voice);
+                                maleVoiceSet = true;
+                                break;
+                            }
+                        }
+
+                        if (maleVoiceSet) {
+                            break;
+                        }
+                    }
+
+                    // 2. Fallback: any English voice that is NOT
+                    //    obviously female.
+                    if (!maleVoiceSet) {
+
+                        for (Voice voice : voices) {
+
+                            String name = voice.getName().toLowerCase(Locale.US);
+
+                            boolean isFemaleName =
+                                    name.contains("female")
+                                            || name.contains("woman")
+                                            || name.contains("kal")
+                                            || name.contains("heather")
+                                            || name.contains("susan");
+
+                            if (name.startsWith("en") && !isFemaleName) {
+
+                                textToSpeech.setVoice(voice);
+                                maleVoiceSet = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+            } catch (Exception ignored) {
+            }
+
+            // 3. Last resort: lower the pitch so even a default
+            //    female voice sounds more masculine.
+            if (!maleVoiceSet) {
+                textToSpeech.setPitch(0.85f);
+            } else {
+                textToSpeech.setPitch(1.0f);
+            }
+
+            textToSpeech.setSpeechRate(1.0f);
         });
     }
 
