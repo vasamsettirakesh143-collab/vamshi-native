@@ -1,6 +1,8 @@
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -33,13 +35,25 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.ChatViewHolder
 
         holder.messageText.setText(message.text);
 
+        FrameLayout.LayoutParams params =
+                (FrameLayout.LayoutParams) holder.messageText.getLayoutParams();
+
         if (message.isUser) {
+
+            // User: right side, ash bubble with red edge.
             holder.messageText.setBackgroundResource(
                     R.drawable.bubble_user);
+            params.gravity = Gravity.END;
+
         } else {
+
+            // Devil bot: left side, dark red glow bubble.
             holder.messageText.setBackgroundResource(
                     R.drawable.bubble_bot);
+            params.gravity = Gravity.START;
         }
+
+        holder.messageText.setLayoutParams(params);
     }
 
     @Override
