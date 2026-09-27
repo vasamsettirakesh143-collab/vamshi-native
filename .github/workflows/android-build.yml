@@ -18,7 +18,7 @@ jobs:
       - run: npm install
       - name: Add Android platform (skip if exists)
         run: npx cap add android || echo ok
-      - run: chmod +x android/gradlew
+      - run: chmod +x android/gradlew  && npx cap sync android
       - run: cd android && ./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
         with:
