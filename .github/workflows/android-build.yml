@@ -14,7 +14,7 @@ jobs:
           java-version: 17
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm install
       - name: Add Android platform (skip if exists)
         run: npx cap add android || echo ok
