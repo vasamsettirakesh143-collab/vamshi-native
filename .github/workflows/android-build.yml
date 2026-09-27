@@ -1,4 +1,3 @@
-```yaml
 name: Build Android APK
 
 on:
@@ -46,8 +45,7 @@ jobs:
         run: |
           if [ -f "native/accessibility_service_config.xml" ]; then
             mkdir -p android/app/src/main/res/xml
-            cp native/accessibility_service_config.xml \
-              android/app/src/main/res/xml/
+            cp native/accessibility_service_config.xml android/app/src/main/res/xml/
           fi
 
       - name: Add required Android dependencies
@@ -65,13 +63,11 @@ jobs:
           """
 
           if "androidx.recyclerview:recyclerview" not in text:
-              marker = "dependencies {"
-              if marker in text:
-                  text = text.replace(
-                      marker,
-                      marker + dependency,
-                      1
-                  )
+              text = text.replace(
+                  "dependencies {",
+                  "dependencies {" + dependency,
+                  1
+              )
 
           path.write_text(text)
           PY
@@ -116,13 +112,10 @@ jobs:
 
       - name: Verify native files
         run: |
-          echo "Checking Vamshi native files..."
-
           test -f android/app/src/main/java/com/vamshi/ai/MainActivity.java
           test -f android/app/src/main/java/com/vamshi/ai/VamshiForegroundService.java
           test -f android/app/src/main/java/com/vamshi/ai/VamshiAccessibilityService.java
           test -f android/app/src/main/java/com/vamshi/ai/VamshiNotificationListenerService.java
-
           echo "Native files OK."
 
       - name: Build APK
@@ -136,4 +129,3 @@ jobs:
         with:
           name: app-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
-```
