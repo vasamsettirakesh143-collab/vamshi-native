@@ -265,7 +265,7 @@ async function tryJarvisCommand(command) {
         text.startsWith("search for ") ||
         text.startsWith("google ")
     ) {
-       (
+        return openWebSearch(
             extractAfter(text, ["search google for", "search for", "google "])
         );
     }

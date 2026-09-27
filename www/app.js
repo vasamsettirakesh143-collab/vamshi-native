@@ -50,7 +50,7 @@ async function VamshiBrain(command) {
 async function askAI(message) {
     try {
         const response = await fetch(
-            "https://vamshi-backend-y6ja.onrender.com/chat",
+            BACKEND_URL + "/chat",
             {
                 method: "POST",
                 headers: {

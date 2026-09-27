@@ -6,9 +6,33 @@ const sendBtn = document.getElementById("sendBtn");
 const attachBtn = document.getElementById("attachBtn");
 const fileInput = document.getElementById("fileInput");
 
-const BACKEND_URL = "https://vamshi-backend-y6ja.onrender.com";
+const CHAT_HISTORY_KEY = "vamshi-chat-history";
 let selectedFile = null;
-fileInput.accept = "image/*";
+
+function loadChatHistory() {
+    try {
+        const history = JSON.parse(localStorage.getItem(CHAT_HISTORY_KEY) || "[]");
+        return Array.isArray(history) ? history : [];
+    } catch (error) {
+        console.error("Could not load chat history:", error);
+        return [];
+    }
+}
+
+function saveChatHistory() {
+    const history = Array.from(chatMessages.children)
+        .filter((bubble) => !bubble.classList.contains("thinking"))
+        .map((bubble) => ({
+            sender: bubble.classList.contains("user") ? "user" : "assistant",
+            text: bubble.textContent
+        }));
+
+    try {
+        localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(history));
+    } catch (error) {
+        console.error("Could not save chat history:", error);
+    }
+}
 
 function addBubble(sender, text, thinking = false ) {
     const bubble = document.createElement("div");
@@ -16,7 +40,14 @@ function addBubble(sender, text, thinking = false ) {
     bubble.textContent = text;
     chatMessages.appendChild(bubble);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+    if (!thinking) saveChatHistory();
     return bubble;
+}
+
+function restoreChatHistory() {
+    const history = loadChatHistory();
+    history.forEach((message) => addBubble(message.sender, message.text));
+    return history.length > 0;
 }
 
 function addImageResult(dataUrl, filename) {
@@ -281,6 +312,14 @@ async function processSelectedImage(instruction) {
         return;
     }
 
+    if (!selectedFile.type.startsWith("image/")) {
+        addBubble("assistant", "I can currently process image attachments only.");
+        selectedFile = null;
+        fileInput.value = "";
+        statusEl.textContent = "Ready";
+        return;
+    }
+
     const request = instruction.trim();
     const localOperation = getLocalOperation(request);
     const question = request || "Describe this image in detail.";
@@ -370,4 +409,6 @@ micBtn.addEventListener("click", async () => {
     }
 });
 
-addBubble("assistant", "Hello Rakesh. I'm Vamshi — type or tap the mic to talk to me.");
+if (!restoreChatHistory()) {
+    addBubble("assistant", "Hello Rakesh. I'm Vamshi — type or tap the mic to talk to me.");
+}

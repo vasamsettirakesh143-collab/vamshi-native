@@ -1,1 +1,1 @@
-// Reserved for future config (API keys, settings) — currently unused.
+const BACKEND_URL = "https://vamshi-backend-y6ja.onrender.com";
