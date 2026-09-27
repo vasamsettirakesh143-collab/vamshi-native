@@ -17,7 +17,7 @@ jobs:
           node-version: 20
       - run: npm install
       - name: Add Android platform (skip if exists)
-        run: npx cap add android || echo "already exists, skipping"
+        run: npx cap add android || echo ok
       - run: chmod +x android/gradlew
       - run: cd android && ./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
