@@ -1,26 +1,118 @@
 name: Build Android APK
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
-      - uses: actions/setup-node@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
-      - name: Add Android platform (skip if exists)
-        run: npx cap add android || echo ok
-      - run: chmod +x android/gradlew  && npx cap sync android
-      - run: cd android && ./gradlew assembleDebug
-      - uses: actions/upload-artifact@v4
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Add Android platform
+        run: npx cap add android || echo "Android platform already exists"
+
+      - name: Copy Vamshi native Java files
+        run: |
+          mkdir -p android/app/src/main/java/com/vamshi/ai
+
+          cp native/*.java \
+            android/app/src/main/java/com/vamshi/ai/
+
+      - name: Copy native Android resources
+        run: |
+          if [ -d "native/res" ]; then
+            cp -R native/res/* android/app/src/main/res/
+          fi
+
+      - name: Copy accessibility configuration
+        run: |
+          if [ -f "native/accessibility_service_config.xml" ]; then
+            mkdir -p android/app/src/main/res/xml
+            cp native/accessibility_service_config.xml \
+              android/app/src/main/res/xml/
+          fi
+
+      - name: Configure Android package
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          files = [
+              Path("android/app/build.gradle"),
+              Path("android/app/build.gradle.kts"),
+          ]
+
+          for path in files:
+              if not path.exists():
+                  continue
+
+              text = path.read_text()
+
+              text = text.replace(
+                  "namespace 'com.getcapacitor.app'",
+                  "namespace 'com.vamshi.ai'"
+              )
+
+              text = text.replace(
+                  'namespace "com.getcapacitor.app"',
+                  'namespace "com.vamshi.ai"'
+              )
+
+              text = text.replace(
+                  "applicationId 'com.getcapacitor.app'",
+                  "applicationId 'com.vamshi.ai'"
+              )
+
+              text = text.replace(
+                  'applicationId "com.getcapacitor.app"',
+                  'applicationId "com.vamshi.ai"'
+              )
+
+              path.write_text(text)
+          PY
+
+      - name: Sync Capacitor
+        run: |
+          chmod +x android/gradlew
+          npx cap sync android
+
+      - name: Verify Vamshi native files
+        run: |
+          echo "Checking native Vamshi files..."
+
+          test -f android/app/src/main/java/com/vamshi/ai/MainActivity.java
+          test -f android/app/src/main/java/com/vamshi/ai/VamshiForegroundService.java
+          test -f android/app/src/main/java/com/vamshi/ai/VamshiAccessibilityService.java
+          test -f android/app/src/main/java/com/vamshi/ai/VamshiNotificationListenerService.java
+
+          echo "Vamshi native files found."
+
+      - name: Build APK
+        run: |
+          cd android
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: app-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
