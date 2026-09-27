@@ -1,131 +1,205 @@
 name: Build Android APK
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+  push:
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
+      - uses: actions/checkout@v4
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
       - name: Install dependencies
         run: npm install
 
-      - name: Add Android platform
-        run: npx cap add android || echo "Android platform already exists"
+      # FIX 1: Compile your web project before trying to sync it to Capacitor
+      - name: Build Web Application
+        run: npm run build --if-present
 
-      - name: Copy Vamshi native Java files
+      - name: Add Android platform
+        run: npx cap add android
+
+      # FIX 4: Delete the default boilerplates created by Capacitor to avoid naming conflicts
+      - name: Clean default Capacitor package folders
+        run: rm -rf android/app/src/main/java/*
+
+      # Keep your existing custom scripting logic
+      - name: Force native package name to com.vamshi.ai
+        run: |
+          python3 - <<'EOF'
+          import re
+          path = "android/app/build.gradle"
+          with open(path) as f:
+              content = f.read()
+          content = re.sub(r'namespace\s+"[^"]*"', 'namespace "com.vamshi.ai"', content)
+          content = re.sub(r'applicationId\s+"[^"]*"', 'applicationId "com.vamshi.ai"', content)
+          with open(path, "w") as f:
+              f.write(content)
+          EOF
+
+      - name: Add recyclerview dependency
+        run: |
+          python3 - <<'EOF'
+          path = "android/app/build.gradle"
+          with open(path) as f:
+              content = f.read()
+          recycler = "    implementation 'androidx.recyclerview:recyclerview:1.3.2'\n"
+          if "androidx.recyclerview" not in content:
+              content = content.replace("dependencies {", "dependencies {\n" + recycler, 1)
+          with open(path, "w") as f:
+              f.write(content)
+          EOF
+
+      - name: Patch AndroidManifest
+        run: |
+          python3 - <<'EOF'
+          import re
+          path = "android/app/src/main/AndroidManifest.xml"
+          with open(path) as f:
+              content = f.read()
+
+          permissions = '''  <uses-permission android:name="android.permission.WAKE_LOCK" />
+            <uses-permission android:name="android.permission.RECORD_AUDIO" />
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+            <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+            <uses-permission android:name="android.permission.CALL_PHONE" />
+            <uses-permission android:name="android.permission.READ_CONTACTS" />
+            <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+            <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+          '''
+          content = content.replace("<application", permissions + '\n    <application\n        android:name=".VamshiApp"', 1)
+          theme = 'android:theme="@style/Theme.AppCompat.NoActionBar"'
+          content = re.sub(r'android:theme="[^"]*"', theme, content)
+          if 'android:theme=' not in content:
+              content = content.replace('<application', '<application\n        ' + theme, 1)
+
+          service_decl = '''    <service
+                android:name=".VamshiForegroundService"
+                android:exported="false"
+                android:foregroundServiceType="microphone" />
+            <service
+                android:name=".VamshiAccessibilityService"
+                android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+                android:exported="false">
+                <intent-filter>
+                    <action android:name="android.accessibilityservice.AccessibilityService" />
+                </intent-filter>
+                <meta-data
+                    android:name="android.accessibilityservice"
+                    android:resource="@xml/accessibility_service_config" />
+            </service>
+            <service
+                android:name=".VamshiNotificationListenerService"
+                android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+                android:exported="false">
+                <intent-filter>
+                    <action android:name="android.service.notification.NotificationListenerService" />
+                </intent-filter>
+            </service>
+            <receiver
+                android:name=".BootReceiver"
+                android:enabled="true"
+                android:exported="true">
+                <intent-filter>
+                    <action android:name="android.intent.action.BOOT_COMPLETED" />
+                </intent-filter>
+            </receiver>
+          </application>'''
+          content = content.replace("</application>", service_decl, 1)
+
+          queries = '''  <queries>
+              <intent>
+                  <action android:name="android.intent.action.MAIN" />
+                  <category android:name="android.intent.category.LAUNCHER" />
+              </intent>
+          </queries>
+          </manifest>'''
+          content = content.replace("</manifest>", queries, 1)
+
+          with open(path, "w") as f:
+              f.write(content)
+          EOF
+
+      - name: Sync web assets into the native project
+        run: npx cap sync android
+
+      - name: Inject native plugins and resources
         run: |
           mkdir -p android/app/src/main/java/com/vamshi/ai
-          cp native/*.java android/app/src/main/java/com/vamshi/ai/
+          cp native/AppLauncherUtil.java android/app/src/main/java/com/vamshi/ai/
+          cp native/AppLauncherNativePlugin.java android/app/src/main/java/com/vamshi/ai/
+          cp native/CallUtil.java android/app/src/main/java/com/vamshi/ai/
+          cp native/ContactLookupUtil.java android/app/src/main/java/com/vamshi/ai/
+          cp native/VamshiForegroundService.java android/app/src/main/java/com/vamshi/ai/
+          cp native/VamshiAccessibilityService.java android/app/src/main/java/com/vamshi/ai/
+          cp native/VamshiNotificationListenerService.java android/app/src/main/java/com/vamshi/ai/
+          cp native/VamshiApp.java android/app/src/main/java/com/vamshi/ai/
+          cp native/MainActivity.java android/app/src/main/java/com/vamshi/ai/
+          cp native/ChatMessage.java android/app/src/main/java/com/vamshi/ai/
+          cp native/ChatAdapter.java android/app/src/main/java/com/vamshi/ai/
+          cp native/BootReceiver.java android/app/src/main/java/com/vamshi/ai/
 
-      - name: Copy Vamshi resources
-        run: |
-          if [ -d "native/res" ]; then
-            cp -R native/res/* android/app/src/main/res/
-          fi
+          mkdir -p android/app/src/main/res/xml
+          cp native/accessibility_service_config.xml android/app/src/main/res/xml/
 
-      - name: Copy accessibility configuration
-        run: |
-          if [ -f "native/accessibility_service_config.xml" ]; then
-            mkdir -p android/app/src/main/res/xml
-            cp native/accessibility_service_config.xml android/app/src/main/res/xml/
-          fi
+          mkdir -p android/app/src/main/res/layout
+          cp native/activity_main.xml android/app/src/main/res/layout/
+          cp native/chat_item.xml android/app/src/main/res/layout/
 
-      - name: Add required Android dependencies
+          mkdir -p android/app/src/main/res/drawable
+          cp native/bubble_user.xml android/app/src/main/res/drawable/
+          cp native/bubble_bot.xml android/app/src/main/res/drawable/
+          cp native/input_devil.xml android/app/src/main/res/drawable/
+
+      # FIX 2: Better safe check for packages to handle leading comments
+      - name: Safe Package Declaration Injector
         run: |
-          python3 - <<'PY'
+          python3 - <<'EOF'
           from pathlib import Path
+          java_folder = Path("android/app/src/main/java/com/vamshi/ai")
+          for java_file in java_folder.glob("*.java"):
+              source = java_file.read_text()
+              if "package com.vamshi.ai;" not in source:
+                  # Read line by line to append after potential file comments
+                  lines = source.splitlines()
+                  inserted = False
+                  for i, line in enumerate(lines):
+                      if line.strip().startswith("import ") or line.strip().startswith("public ") or line.strip().startswith("class "):
+                          lines.insert(i, "package com.vamshi.ai;\n")
+                          inserted = True
+                          break
+                  if not inserted:
+                      lines.insert(0, "package com.vamshi.ai;\n")
+                  java_file.write_text("\n".join(lines))
+          EOF
 
-          path = Path("android/app/build.gradle")
-          text = path.read_text()
+      # FIX 3: Force file execution permissions onto Gradle wrapper
+      - name: Grant Execute Permissions to Gradlew
+        working-directory: android
+        run: chmod +x gradlew
 
-          dependency = """
-              implementation 'androidx.recyclerview:recyclerview:1.4.0'
-              implementation 'androidx.appcompat:appcompat:1.7.1'
-              implementation 'androidx.core:core:1.17.0'
-          """
-
-          if "androidx.recyclerview:recyclerview" not in text:
-              text = text.replace(
-                  "dependencies {",
-                  "dependencies {" + dependency,
-                  1
-              )
-
-          path.write_text(text)
-          PY
-
-      - name: Configure Vamshi package
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path("android/app/build.gradle")
-
-          if path.exists():
-              text = path.read_text()
-
-              text = text.replace(
-                  "namespace 'com.getcapacitor.app'",
-                  "namespace 'com.vamshi.ai'"
-              )
-
-              text = text.replace(
-                  'namespace "com.getcapacitor.app"',
-                  'namespace "com.vamshi.ai"'
-              )
-
-              text = text.replace(
-                  "applicationId 'com.getcapacitor.app'",
-                  "applicationId 'com.vamshi.ai'"
-              )
-
-              text = text.replace(
-                  'applicationId "com.getcapacitor.app"',
-                  'applicationId "com.vamshi.ai"'
-              )
-
-              path.write_text(text)
-          PY
-
-      - name: Sync Capacitor
-        run: |
-          chmod +x android/gradlew
-          npx cap sync android
-
-      - name: Verify native files
-        run: |
-          test -f android/app/src/main/java/com/vamshi/ai/MainActivity.java
-          test -f android/app/src/main/java/com/vamshi/ai/VamshiForegroundService.java
-          test -f android/app/src/main/java/com/vamshi/ai/VamshiAccessibilityService.java
-          test -f android/app/src/main/java/com/vamshi/ai/VamshiNotificationListenerService.java
-          echo "Native files OK."
-
-      - name: Build APK
-        run: |
-          cd android
-          ./gradlew clean
-          ./gradlew assembleDebug
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
+          name: vamshi-ai-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
