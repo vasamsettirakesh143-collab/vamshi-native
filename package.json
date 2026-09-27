@@ -3,12 +3,29 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "@capacitor/android": "latest",
-    "@capacitor/core": "latest",
+    "@capacitor-community/speech-recognition": "latest",
     "@capacitor-community/text-to-speech": "latest",
-    "@capacitor-community/speech-recognition": "latest"
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2"
   },
   "devDependencies": {
-    "@capacitor/cli": "latest"
-  }
+    "@capacitor/cli": "^8.5.2"
+  },
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vasamsettirakesh143-collab/vamshi-native.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/vasamsettirakesh143-collab/vamshi-native/issues"
+  },
+  "homepage": "https://github.com/vasamsettirakesh143-collab/vamshi-native#readme"
 }
