@@ -52,7 +52,6 @@ jobs:
           cp native/accessibility_service_config.xml android/app/src/main/res/xml/
           cp native/activity_main.xml native/chat_item.xml android/app/src/main/res/layout/
           cp native/bubble_user.xml native/bubble_bot.xml native/input_devil.xml android/app/src/main/res/drawable/
-          cp native/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
 
       - name: Grant execute permission to gradlew
         run: chmod +x android/gradlew
