@@ -45,7 +45,11 @@
         <service
             android:name=".VamshiForegroundService"
             android:exported="false"
-            android:foregroundServiceType="microphone" />
+            android:foregroundServiceType="microphone|specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Continuous voice assistant listening for wake word" />
+        </service>
 
         <service
             android:name=".VamshiAccessibilityService"
