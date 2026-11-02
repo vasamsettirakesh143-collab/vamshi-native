@@ -62,11 +62,9 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-
         super.onCreate(savedInstanceState);
 
         try {
-
             setContentView(R.layout.activity_main);
 
             chatRecyclerView = findViewById(R.id.chatRecyclerView);
@@ -76,178 +74,108 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
             statusText = findViewById(R.id.statusText);
 
             chatMessages = new ArrayList<>();
-
             chatAdapter = new ChatAdapter(chatMessages);
-
-            chatRecyclerView.setLayoutManager(
-                    new LinearLayoutManager(this));
-
+            chatRecyclerView.setLayoutManager(new LinearLayoutManager(this));
             chatRecyclerView.setAdapter(chatAdapter);
 
             sendButton.setOnClickListener(v -> sendMessage());
-
             micButton.setOnClickListener(v -> toggleMic());
 
-            Button btnAccessibility =
-                    findViewById(R.id.btnAccessibility);
-
-            Button btnNotifications =
-                    findViewById(R.id.btnNotifications);
+            Button btnAccessibility = findViewById(R.id.btnAccessibility);
+            Button btnNotifications = findViewById(R.id.btnNotifications);
 
             btnAccessibility.setOnClickListener(v -> {
                 try {
-                    startActivity(new Intent(
-                            Settings.ACTION_ACCESSIBILITY_SETTINGS));
-                } catch (Exception ignored) {
-                }
+                    startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                } catch (Exception ignored) {}
             });
 
             btnNotifications.setOnClickListener(v -> {
                 try {
-                    startActivity(new Intent(
-                            Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
-                } catch (Exception ignored) {
-                }
+                    startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
+                } catch (Exception ignored) {}
             });
 
             requestNeededPermissions();
 
-            Intent serviceIntent =
-                    new Intent(this, VamshiForegroundService.class);
-
+            Intent serviceIntent = new Intent(this, VamshiForegroundService.class);
             ContextCompat.startForegroundService(this, serviceIntent);
 
             checkAccessibilityPrompt();
-
             requestIgnoreBatteryOptimization();
 
         } catch (Throwable e) {
-
-            android.widget.LinearLayout root =
-                    new android.widget.LinearLayout(this);
-
+            android.widget.LinearLayout root = new android.widget.LinearLayout(this);
             root.setOrientation(android.widget.LinearLayout.VERTICAL);
-
             TextView errorView = new TextView(this);
-
             errorView.setTextColor(0xFFFF3333);
             errorView.setTextSize(16);
             errorView.setPadding(40, 100, 40, 40);
-            errorView.setText(
-                    "STARTUP ERROR:\n\n"
-                            + android.util.Log.getStackTraceString(e));
-
+            errorView.setText("STARTUP ERROR:\n\n" + android.util.Log.getStackTraceString(e));
             setContentView(root, new android.view.ViewGroup.LayoutParams(
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT));
-
             root.addView(errorView);
         }
     }
 
     private void checkAccessibilityPrompt() {
-
-        if (VamshiAccessibilityService.isRunning()) {
-            return;
-        }
+        if (VamshiAccessibilityService.isRunning()) return;
 
         new AlertDialog.Builder(this)
                 .setTitle("Enable Vamshi Assistant")
-                .setMessage(
-                        "Vamshi needs the Accessibility service to open apps, "
-                                + "search YouTube, and read the screen.\n\n"
-                                + "Tap ENABLE, find \"Vamshi AI\" in the list, "
-                                + "and turn it ON.")
+                .setMessage("Vamshi needs the Accessibility service to open apps, search YouTube, and read the screen.\n\nTap ENABLE, find \"Vamshi AI\" in the list, and turn it ON.")
                 .setPositiveButton("ENABLE", (dialog, which) -> {
                     try {
-                        startActivity(new Intent(
-                                Settings.ACTION_ACCESSIBILITY_SETTINGS));
-                    } catch (Exception ignored) {
-                    }
+                        startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                    } catch (Exception ignored) {}
                 })
                 .setNegativeButton("Later", null)
                 .show();
     }
 
     private void requestIgnoreBatteryOptimization() {
-
-        PowerManager pm =
-                (PowerManager) getSystemService(POWER_SERVICE);
-
-        if (pm == null) {
-            return;
-        }
+        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+        if (pm == null) return;
 
         if (!pm.isIgnoringBatteryOptimizations(getPackageName())) {
-
             try {
                 startActivity(new Intent(
                         Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
                         Uri.parse("package:" + getPackageName())));
-            } catch (Exception ignored) {
-            }
+            } catch (Exception ignored) {}
         }
     }
 
     private void requestNeededPermissions() {
-
         ArrayList<String> needed = new ArrayList<>();
 
-        if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.RECORD_AUDIO)
-                != PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             needed.add(Manifest.permission.RECORD_AUDIO);
         }
-
-        if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.CAMERA)
-                != PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             needed.add(Manifest.permission.CAMERA);
         }
-
-        if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.READ_CONTACTS)
-                != PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
             needed.add(Manifest.permission.READ_CONTACTS);
         }
-
-        if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.CALL_PHONE)
-                != PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
             needed.add(Manifest.permission.CALL_PHONE);
         }
-
-        if (Build.VERSION.SDK_INT >= 33
-                && ContextCompat.checkSelfPermission(this,
-                Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED) {
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             needed.add(Manifest.permission.POST_NOTIFICATIONS);
         }
 
         if (!needed.isEmpty()) {
-            ActivityCompat.requestPermissions(
-                    this,
-                    needed.toArray(new String[0]),
-                    PERMISSIONS_REQUEST);
+            ActivityCompat.requestPermissions(this, needed.toArray(new String[0]), PERMISSIONS_REQUEST);
         }
     }
 
     @Override
-    public void onRequestPermissionsResult(
-            int requestCode,
-            @NonNull String[] permissions,
-            @NonNull int[] grantResults) {
-
-        super.onRequestPermissionsResult(requestCode,
-                permissions, grantResults);
-
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSIONS_REQUEST) {
-
-            boolean micGranted =
-                    ContextCompat.checkSelfPermission(this,
-                            Manifest.permission.RECORD_AUDIO)
-                            == PackageManager.PERMISSION_GRANTED;
-
+            boolean micGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
             if (!micGranted) {
                 statusText.setText("Microphone permission needed for voice");
                 statusText.setTextColor(0xFFFF7043);
@@ -256,15 +184,10 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
     }
 
     private void sendMessage() {
-
         String text = messageInput.getText().toString().trim();
-
-        if (text.isEmpty()) {
-            return;
-        }
+        if (text.isEmpty()) return;
 
         messageInput.setText("");
-
         chatMessages.add(new ChatMessage(text, true));
         chatAdapter.notifyItemInserted(chatMessages.size() - 1);
         scrollToBottom();
@@ -274,7 +197,6 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
 
         askBackend(text);
     }
-
     private boolean isVisionQuery(String text) {
         String lower = text.toLowerCase();
         return lower.contains("see me") || lower.contains("look at") || lower.contains("dress") || 
@@ -310,7 +232,8 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
 
                                 JSONObject vBody = new JSONObject();
                                 vBody.put("message", message);
-                                JSONObject imgObj =Obj.put("mimeType", "image/jpeg");
+                                JSONObject imgObj = new JSONObject();
+                               Obj.put("mimeType", "image/jpeg");
                                 vBody.put("image", imgObj);
 
                                 OutputStream vos = vConn.getOutputStream();
