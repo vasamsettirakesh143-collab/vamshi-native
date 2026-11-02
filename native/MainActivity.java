@@ -140,7 +140,7 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
         if (!pm.isIgnoringBatteryOptimizations(getPackageName())) {
             try {
                 startActivity(new Intent(
-                        Settings.ACTION_REQUEST_IGNORE_BATIONS,
+                        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
                         Uri.parse("package:" + getPackageName())));
             } catch (Exception ignored) {}
         }
