@@ -233,7 +233,9 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
 
                                 JSONObject vBody = new JSONObject();
                                 vBody.put("message", message);
-                                JSONObject imgObj =Obj.put("mimeType", "image/jpeg");
+                                
+                                JSONObject imgObj = new JSONObject();
+                                imgimage/jpeg;base64," + encoded);
                                 vBody.put("image", imgObj);
 
                                 OutputStream vos = vConn.getOutputStream();
