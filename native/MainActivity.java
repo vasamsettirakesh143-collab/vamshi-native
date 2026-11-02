@@ -232,15 +232,17 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
                                 vConn.setDoOutput(true);
 
                                 JSONObject vBody = new JSONObject();
-                                vBody.put("message", message);
-                                
-                                JSONObject imgObj = new JSONObject();
-                                imgimage/jpeg;base64," + encoded);
-                                vBody.put("image", imgObj);
+vBody.put("message", message);
 
-                                OutputStream vos = vConn.getOutputStream();
-                                vos.write(vBody.toString().getBytes("UTF-8"));
-                                vos.close();
+JSONObject imgObj = new JSONObject();
+// FIX: Correctly format the key-value pair and wrap the base64 prefix in double quotes
+imgObj.put("image", "data:image/jpeg;base64," + encoded); 
+vBody.put("image", imgObj);
+
+OutputStream vos = vConn.getOutputStream();
+vos.write(vBody.toString().getBytes("UTF-8"));
+vos.close();
+                                
 
                                 BufferedReader vbr = new BufferedReader(new InputStreamReader(vConn.getInputStream()));
                                 StringBuilder vsb = new StringBuilder();
