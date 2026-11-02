@@ -3,6 +3,7 @@ package com.vamshi.ai;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -11,6 +12,7 @@ import android.provider.Settings;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
+import android.util.Base64;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
@@ -41,6 +43,8 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
             "https://vamshi-backend-y6ja.onrender.com/chat";
     private static final String ACTION_URL =
             "https://vamshi-backend-y6ja.onrender.com/action";
+    private static final String VISION_URL =
+            "https://vamshi-backend-y6ja.onrender.com/vision";
 
     private static final int PERMISSIONS_REQUEST = 100;
 
@@ -55,6 +59,9 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
 
     private SpeechRecognizer speechRecognizer;
     private boolean micActive = false;
+
+    // Dummy camera bitmap holder for background snapshot when vision is requested
+    private Bitmap lastCameraBitmap = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -142,10 +149,6 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
         }
     }
 
-    /*
-     * Prompts the user to enable the accessibility service
-     * if it is not already on.
-     */
     private void checkAccessibilityPrompt() {
 
         if (VamshiAccessibilityService.isRunning()) {
@@ -170,9 +173,6 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
                 .show();
     }
 
-    /*
-     * Asks Android to never battery-kill Vamshi.
-     */
     private void requestIgnoreBatteryOptimization() {
 
         PowerManager pm =
@@ -201,6 +201,12 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
                 Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
             needed.add(Manifest.permission.RECORD_AUDIO);
+        }
+
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED) {
+            needed.add(Manifest.permission.CAMERA);
         }
 
         if (ContextCompat.checkSelfPermission(this,
@@ -253,10 +259,6 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
         }
     }
 
-    /*
-     * ================= CHAT =================
-     */
-
     private void sendMessage() {
 
         String text = messageInput.getText().toString().trim();
@@ -277,15 +279,88 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
         askBackend(text);
     }
 
-    /*
-     * Brain flow:
-     * Step 1: ask /action if this is an action command.
-     * Step 2: if yes, run the action (and show it in chat).
-     * Step 3: if no, show the normal /chat reply.
-     */
+    private boolean isVisionQuery(String text) {
+        String lower = text.toLowerCase();
+        return lower.contains("see me") || lower.contains("look at") || lower.contains("dress") || 
+               lower.contains("wearing") || lower.contains("what do you see") || lower.contains("front of you");
+    }
+
     private void askBackend(String message) {
 
         new Thread(() -> {
+
+            // If user asks about what Vamshi sees, route to /vision
+            if (isVisionQuery(message)) {
+                try {
+                    // Capture a temporary photo using Android Camera API in background
+                    android.hardware.Camera cam = null;
+                    try {
+                        cam = android.hardware.Camera.open(android.hardware.Camera.CameraInfo.CAMERA_FACING_FRONT);
+                        cam.setPreviewTexture(new android.graphics.SurfaceTexture(10));
+                        cam.startPreview();
+                        cam.takePicture(null, null, (data, camera) -> {
+                            try {
+                                camera.stopPreview();
+                                camera.release();
+                                
+                                Bitmap bitmap = android.graphics.BitmapFactory.decodeByteArray(data, 0, data.length);
+                                java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                                bitmap.compress(Bitmap.CompressFormat.JPEG, 80, baos);
+                                String encoded = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP);
+
+                                // Send to /vision backend
+                                URL visionUrl = new URL(VISION_URL);
+                                HttpURLConnection vConn = (HttpURLConnection) visionUrl.openConnection();
+                                vConn.setRequestMethod("POST");
+                                vConn.setRequestProperty("Content-Type", "application/json");
+                                vConn.setDoOutput(true);
+
+                                JSONObject vBody = new JSONObject();
+                                vBody.image/jpeg;base64," + encoded);
+                                imgObj.put("mimeType", "image/jpeg");
+                                vBody.put("image", imgObj);
+
+                                OutputStream vos = vConn.getOutputStream();
+                                vos.write(vBody.toString().getBytes("UTF-8"));
+                                vos.close();
+
+                                BufferedReader vbr = new BufferedReader(new InputStreamReader(vConn.getInputStream()));
+                                StringBuilder vsb = new StringBuilder();
+                                String vline;
+                                while ((vline = vbr.readLine()) != null) {
+                                    vsb.append(vline);
+                                }
+                                vbr.close();
+
+                                JSONObject vResp = new JSONObject(vsb.toString());
+                                final String vReply = vResp.optString("reply", "I cannot see clearly.");
+
+                                runOnUiThread(() -> {
+                                    chatMessages.add(new ChatMessage(vReply, false));
+                                    chatAdapter.notifyItemInserted(chatMessages.size() - 1);
+                                    scrollToBottom();
+                                    statusText.setText("Ready");
+                                    statusText.setTextColor(0xFF8BC34A);
+                                });
+
+                            } catch (Exception e) {
+                                runOnUiThread(() -> {
+                                    chatMessages.add(new ChatMessage("Vision error: " + e.getMessage(), false));
+                                    chatAdapter.notifyItemInserted(chatMessages.size() - 1);
+                                    scrollToBottom();
+                                    statusText.setText("Ready");
+                                    statusText.setTextColor(0xFF8BC34A);
+                                });
+                            }
+                        });
+                        return;
+                    } catch (Exception camEx) {
+                        if (cam != null) {
+                            try { cam.release(); } catch (Exception ignored) {}
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
 
             String actionJson = null;
 
@@ -338,7 +413,6 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
                 actionConn.disconnect();
 
             } catch (Exception ignored) {
-                // Fall through to normal chat.
             }
 
             if (actionJson != null) {
@@ -430,10 +504,6 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
         }).start();
     }
 
-    /*
-     * The backend sometimes returns reply as a string,
-     * sometimes as an array of message chunks.
-     */
     private String extractReply(JSONObject respJson) {
 
         try {
@@ -473,10 +543,6 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
         }
     }
 
-    /*
-     * Runs an action decided by the AI brain by
-     * forwarding it to the foreground service.
-     */
     private void runAiAction(String actionJson) {
 
         try {
@@ -525,10 +591,6 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
                     chatMessages.size() - 1);
         }
     }
-
-    /*
-     * ================= VOICE INPUT (mic button) =================
-     */
 
     private void toggleMic() {
 
@@ -627,10 +689,12 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
 
     @Override
     public void onReadyForSpeech(Bundle params) {
+        // Not used
     }
 
     @Override
     public void onBeginningOfSpeech() {
+        // Not used
     }
 
     @Override
