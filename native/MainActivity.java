@@ -60,9 +60,6 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
     private SpeechRecognizer speechRecognizer;
     private boolean micActive = false;
 
-    // Dummy camera bitmap holder for background snapshot when vision is requested
-    private Bitmap lastCameraBitmap = null;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
 
@@ -115,7 +112,6 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
 
             requestNeededPermissions();
 
-            // Start the always-listening foreground service.
             Intent serviceIntent =
                     new Intent(this, VamshiForegroundService.class);
 
@@ -289,10 +285,8 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
 
         new Thread(() -> {
 
-            // If user asks about what Vamshi sees, route to /vision
             if (isVisionQuery(message)) {
                 try {
-                    // Capture a temporary photo using Android Camera API in background
                     android.hardware.Camera cam = null;
                     try {
                         cam = android.hardware.Camera.open(android.hardware.Camera.CameraInfo.CAMERA_FACING_FRONT);
@@ -308,7 +302,6 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
                                 bitmap.compress(Bitmap.CompressFormat.JPEG, 80, baos);
                                 String encoded = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP);
 
-                                // Send to /vision backend
                                 URL visionUrl = new URL(VISION_URL);
                                 HttpURLConnection vConn = (HttpURLConnection) visionUrl.openConnection();
                                 vConn.setRequestMethod("POST");
@@ -316,8 +309,9 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
                                 vConn.setDoOutput(true);
 
                                 JSONObject vBody = new JSONObject();
-                                vBody.image/jpeg;base64," + encoded);
-                                imgObj.put("mimeType", "image/jpeg");
+                                vBody.put("message", message);
+                                JSONObject imgObj = new JSONObject();
+                                imgObj.putmimeType", "image/jpeg");
                                 vBody.put("image", imgObj);
 
                                 OutputStream vos = vConn.getOutputStream();
@@ -688,40 +682,29 @@ public class MainActivity extends AppCompatActivity implements RecognitionListen
     }
 
     @Override
-    public void onReadyForSpeech(Bundle params) {
-        // Not used
-    }
+    public void onReadyForSpeech(Bundle params) {}
 
     @Override
-    public void onBeginningOfSpeech() {
-        // Not used
-    }
+    public void onBeginningOfSpeech() {}
 
     @Override
-    public void onRmsChanged(float rmsdB) {
-    }
+    public void onRmsChanged(float rmsdB) {}
 
     @Override
-    public void onBufferReceived(byte[] buffer) {
-    }
+    public void onBufferReceived(byte[] buffer) {}
 
     @Override
-    public void onEndOfSpeech() {
-    }
+    public void onEndOfSpeech() {}
 
     @Override
-    public void onPartialResults(Bundle partialResults) {
-    }
+    public void onPartialResults(Bundle partialResults) {}
 
     @Override
-    public void onEvent(int eventType, Bundle params) {
-    }
+    public void onEvent(int eventType, Bundle params) {}
 
     @Override
     protected void onDestroy() {
-
         super.onDestroy();
-
         if (speechRecognizer != null) {
             speechRecognizer.destroy();
             speechRecognizer = null;
